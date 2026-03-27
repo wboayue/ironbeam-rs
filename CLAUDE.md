@@ -33,7 +33,7 @@ src/
   error.rs          — error types (thiserror)
   client/
     config.rs       — ClientConfig (base_url, credentials, timeouts)
-    http.rs         — low-level async HTTP (reqwest), token management
+    http.rs         — thin ergonomic wrapper around hyper (JSON send/recv, status mapping, token injection)
     rest/           — typed REST endpoint methods, one file per domain
       auth.rs
       account.rs
@@ -74,8 +74,8 @@ QuoteFull, Depth/DepthLevel, TradeBar, TickBar, TimeBar, VolumeBar
 | Concern | Crate | Notes |
 |---------|-------|-------|
 | Async runtime | `tokio` | Use `tokio::select!` for concurrent stream + REST |
-| HTTP | `reqwest` | Reuse single `Client` with connection pooling |
-| WebSocket | `tokio-tungstenite` | Async WebSocket with auto-reconnect |
+| HTTP | `hyper` + `hyper-util` | Thin wrapper in `client/http.rs`; `hyper-rustls` for TLS |
+| WebSocket | `fastwebsockets` | Zero-copy frame parsing; use `from_slice` on payloads |
 | Serialization | `serde` + `serde_json` | `serde_repr` for integer enums |
 | Date/time | `time` | Never use `chrono` |
 | Errors | `thiserror` | Typed error enums, no `anyhow` in library code |
