@@ -3,6 +3,9 @@ mod http;
 pub(crate) mod rest;
 
 pub use config::{ClientBuilder, Credentials};
+pub use http::HttpTransport;
+
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use bytes::Bytes;
 use hyper::header::HeaderMap;
@@ -34,10 +37,11 @@ use http::HttpClient;
 /// # Ok(())
 /// # }
 /// ```
-pub struct Client {
+pub struct Client<H: HttpTransport = HttpClient> {
     pub(crate) base_url: String,
     pub(crate) auth_headers: HeaderMap,
-    pub(crate) http: HttpClient,
+    pub(crate) http: H,
+    pub(crate) is_logged_out: AtomicBool,
 }
 
 impl Client {
@@ -46,7 +50,9 @@ impl Client {
     pub fn builder() -> ClientBuilder {
         ClientBuilder::new()
     }
+}
 
+impl<H: HttpTransport> Client<H> {
     /// Send an authenticated GET request and deserialize the JSON response.
     pub(crate) async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
         let uri = format!("{}{path}", self.base_url).parse()?;
@@ -77,10 +83,32 @@ impl Client {
         if !status.is_success() {
             return Err(Error::Api {
                 status: status.as_u16(),
-                message: String::from_utf8_lossy(&resp_body).into_owned(),
+                message: parse_api_error(&resp_body),
             });
         }
 
         Ok(serde_json::from_slice(&resp_body)?)
+    }
+}
+
+impl<H: HttpTransport> Drop for Client<H> {
+    fn drop(&mut self) {
+        if self.is_logged_out.load(Ordering::Acquire) {
+            return;
+        }
+
+        let Ok(handle) = tokio::runtime::Handle::try_current() else {
+            return;
+        };
+
+        let http = self.http.clone();
+        let base_url = self.base_url.clone();
+        let headers = self.auth_headers.clone();
+
+        handle.spawn(async move {
+            if let Err(e) = rest::auth::logout(&http, &base_url, &headers).await {
+                tracing::warn!("logout on drop failed: {e}");
+            }
+        });
     }
 }

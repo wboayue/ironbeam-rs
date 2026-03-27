@@ -1,3 +1,5 @@
+use std::sync::atomic::AtomicBool;
+
 use hyper::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 
 use crate::error::{Error, Result};
@@ -90,6 +92,7 @@ impl ClientBuilder {
             base_url: self.base_url,
             auth_headers,
             http,
+            is_logged_out: AtomicBool::new(false),
         })
     }
 }
