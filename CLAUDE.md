@@ -12,3 +12,12 @@ Ironbeam API documentation is in `specs/`. Start with `specs/README.md` for over
 - `specs/streaming.md` — WebSocket lifecycle, subscriptions, indicators
 - `specs/simulation.md` — demo-only simulated trader/account management
 - `specs/types.md` — all enums, type aliases, and data structures (load alongside any endpoint file)
+
+## Preferences
+
+- **Async runtime:** tokio
+- **Serialization:** serde
+- **Date/time:** time
+- Optimize for low latency
+- All public client methods must have rustdoc comments with inline example code
+- `examples/` folder must have runnable examples for all API usage, suitable for copy-paste
