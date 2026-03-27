@@ -28,7 +28,7 @@ impl std::fmt::Debug for Credentials {
 
 /// Builder for constructing and connecting a [`Client`].
 ///
-/// Created via [`Client::new()`]. Configure with fluent methods, then call
+/// Created via [`Client::builder()`]. Configure with fluent methods, then call
 /// [`connect()`](ClientBuilder::connect) to authenticate and obtain a `Client`.
 pub struct ClientBuilder {
     base_url: String,
@@ -88,7 +88,6 @@ impl ClientBuilder {
 
         Ok(Client {
             base_url: self.base_url,
-            token,
             auth_headers,
             http,
         })

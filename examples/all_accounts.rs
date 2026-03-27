@@ -12,7 +12,7 @@ use ironbeam_rs::client::{Client, Credentials};
 /// ```
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let client = Client::new()
+    let client = Client::builder()
         .credentials(Credentials {
             username: env::var("IRONBEAM_USERNAME")?,
             password: env::var("IRONBEAM_PASSWORD")?,

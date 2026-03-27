@@ -8,19 +8,19 @@ use bytes::Bytes;
 use hyper::header::HeaderMap;
 use serde::de::DeserializeOwned;
 
-use crate::error::{Error, Result};
+use crate::error::{Error, Result, parse_api_error};
 use http::HttpClient;
 
 /// Authenticated Ironbeam API client.
 ///
-/// Constructed via [`Client::new()`] → [`ClientBuilder`] → [`ClientBuilder::connect()`].
+/// Constructed via [`Client::builder()`] → [`ClientBuilder`] → [`ClientBuilder::connect()`].
 ///
 /// # Example
 ///
 /// ```no_run
 /// # use ironbeam_rs::client::{Client, Credentials};
 /// # async fn example() -> ironbeam_rs::error::Result<()> {
-/// let client = Client::new()
+/// let client = Client::builder()
 ///     .credentials(Credentials {
 ///         username: "user".into(),
 ///         password: "pass".into(),
@@ -36,7 +36,6 @@ use http::HttpClient;
 /// ```
 pub struct Client {
     pub(crate) base_url: String,
-    pub(crate) token: String,
     pub(crate) auth_headers: HeaderMap,
     pub(crate) http: HttpClient,
 }
@@ -44,7 +43,7 @@ pub struct Client {
 impl Client {
     /// Start building a new client.
     #[must_use]
-    pub fn new() -> ClientBuilder {
+    pub fn builder() -> ClientBuilder {
         ClientBuilder::new()
     }
 
@@ -56,7 +55,7 @@ impl Client {
         if !status.is_success() {
             return Err(Error::Api {
                 status: status.as_u16(),
-                message: String::from_utf8_lossy(&body).into_owned(),
+                message: parse_api_error(&body),
             });
         }
 
@@ -84,5 +83,4 @@ impl Client {
 
         Ok(serde_json::from_slice(&resp_body)?)
     }
-
 }

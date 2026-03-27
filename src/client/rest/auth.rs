@@ -3,7 +3,7 @@ use hyper::header::HeaderMap;
 
 use crate::client::config::Credentials;
 use crate::client::http::HttpClient;
-use crate::error::{Error, Result};
+use crate::error::{Error, Result, parse_api_error};
 use crate::types::{AuthorizationRequest, AuthorizationResponse, ResponseStatus};
 
 /// Authenticate with the Ironbeam API and return the bearer token.
@@ -26,7 +26,7 @@ pub async fn authenticate(
     if !status.is_success() {
         return Err(Error::Api {
             status: status.as_u16(),
-            message: String::from_utf8_lossy(&resp_bytes).into_owned(),
+            message: parse_api_error(&resp_bytes),
         });
     }
 

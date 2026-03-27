@@ -1,14 +1,14 @@
 use serde::{Deserialize, Serialize};
 
-use super::{
-    Balance, ComplexGroupInfo, ComplexGroups, FutureInfo, OptionGroupInfo, OrderFill,
-    Position, RiskInfo, SecurityDefinition, SecurityMarginAndValue, SecurityStatus, Spread,
-    Symbol, SymbolInfo, TraderInfo, UserInfo,
-};
 use super::account::AccountPositions;
 use super::common::Response;
 use super::market::{Depth, QuoteFull, Trade};
 use super::order::Order;
+use super::{
+    Balance, ComplexGroupInfo, ComplexGroups, FutureInfo, OptionGroupInfo, OrderFill, Position,
+    RiskInfo, SecurityDefinition, SecurityMarginAndValue, SecurityStatus, Spread, Symbol,
+    SymbolInfo, TraderInfo, UserInfo,
+};
 
 /// Authentication response.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

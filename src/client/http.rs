@@ -8,8 +8,7 @@ use hyper_util::rt::TokioExecutor;
 
 use crate::error::{Error, Result};
 
-type Connector =
-    hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>;
+type Connector = hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>;
 
 /// Thin HTTP transport layer over hyper + rustls.
 ///

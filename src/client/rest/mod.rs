@@ -1,2 +1,2 @@
-pub(crate) mod auth;
 mod account;
+pub(crate) mod auth;

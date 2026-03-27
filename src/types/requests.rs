@@ -37,7 +37,11 @@ pub struct OrderRequest {
     pub duration: DurationType,
 
     /// Limit price (required for LIMIT, STOP_LIMIT).
-    #[serde(rename = "limitPrice", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "limitPrice",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub limit_price: Option<f64>,
 
     /// Stop price (required for STOP, STOP_LIMIT).
@@ -49,23 +53,43 @@ pub struct OrderRequest {
     pub stop_loss: Option<f64>,
 
     /// Bracket take profit price.
-    #[serde(rename = "takeProfit", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "takeProfit",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub take_profit: Option<f64>,
 
     /// Stop loss offset in pips.
-    #[serde(rename = "stopLossOffset", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "stopLossOffset",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub stop_loss_offset: Option<f32>,
 
     /// Take profit offset in pips.
-    #[serde(rename = "takeProfitOffset", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "takeProfitOffset",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub take_profit_offset: Option<f32>,
 
     /// Trailing stop (not yet supported).
-    #[serde(rename = "trailingStop", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "trailingStop",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub trailing_stop: Option<f32>,
 
     /// Wait for exchange order ID (default: true).
-    #[serde(rename = "waitForOrderId", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "waitForOrderId",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub wait_for_order_id: Option<bool>,
 }
 
@@ -80,7 +104,11 @@ pub struct OrderUpdateRequest {
     pub quantity: i32,
 
     /// New limit price.
-    #[serde(rename = "limitPrice", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "limitPrice",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub limit_price: Option<f64>,
 
     /// New stop price.
@@ -92,15 +120,27 @@ pub struct OrderUpdateRequest {
     pub stop_loss: Option<f64>,
 
     /// New take profit price.
-    #[serde(rename = "takeProfit", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "takeProfit",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub take_profit: Option<f64>,
 
     /// New stop loss offset.
-    #[serde(rename = "stopLossOffset", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "stopLossOffset",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub stop_loss_offset: Option<f32>,
 
     /// New take profit offset.
-    #[serde(rename = "takeProfitOffset", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "takeProfitOffset",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub take_profit_offset: Option<f32>,
 }
 
@@ -189,31 +229,83 @@ pub struct SimulatedAccountAddCashRequest {
 pub struct SimulatedAccountSetRiskRequest {
     #[serde(rename = "AccountId")]
     pub account_id: String,
-    #[serde(rename = "LiquidationAccountValue", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "LiquidationAccountValue",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub liquidation_account_value: Option<f64>,
-    #[serde(rename = "LiquidationLossFromStartOfDay", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "LiquidationLossFromStartOfDay",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub liquidation_loss_from_start_of_day: Option<f64>,
-    #[serde(rename = "LiquidationLossFromHighOfDay", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "LiquidationLossFromHighOfDay",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub liquidation_loss_from_high_of_day: Option<f64>,
-    #[serde(rename = "LiquidationLossFromHighOfMultiday", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "LiquidationLossFromHighOfMultiday",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub liquidation_loss_from_high_of_multiday: Option<f64>,
-    #[serde(rename = "LiquidationPctLossFromStartOfDay", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "LiquidationPctLossFromStartOfDay",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub liquidation_pct_loss_from_start_of_day: Option<f64>,
-    #[serde(rename = "LiquidationPctLossFromHighOfDay", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "LiquidationPctLossFromHighOfDay",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub liquidation_pct_loss_from_high_of_day: Option<f64>,
-    #[serde(rename = "LiquidationPctLossFromHighOfMultiday", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "LiquidationPctLossFromHighOfMultiday",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub liquidation_pct_loss_from_high_of_multiday: Option<f64>,
-    #[serde(rename = "LiquidationPctMarginDeficiency", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "LiquidationPctMarginDeficiency",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub liquidation_pct_margin_deficiency: Option<f64>,
-    #[serde(rename = "LiquidationMaxValueOverride", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "LiquidationMaxValueOverride",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub liquidation_max_value_override: Option<f64>,
-    #[serde(rename = "ReducePositionsOnly", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "ReducePositionsOnly",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub reduce_positions_only: Option<bool>,
-    #[serde(rename = "RestoreTrading", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "RestoreTrading",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub restore_trading: Option<bool>,
-    #[serde(rename = "MarginScheduleName", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "MarginScheduleName",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub margin_schedule_name: Option<String>,
-    #[serde(rename = "TemplateId", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "TemplateId",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub template_id: Option<String>,
 }
 
@@ -224,15 +316,35 @@ pub struct SimulatedAccountLiquidateRequest {
     pub accounts: Option<Vec<String>>,
     #[serde(rename = "Groups", default, skip_serializing_if = "Option::is_none")]
     pub groups: Option<Vec<String>>,
-    #[serde(rename = "ExceptAccounts", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "ExceptAccounts",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub except_accounts: Option<Vec<String>>,
-    #[serde(rename = "ForceManualLiquidation", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "ForceManualLiquidation",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub force_manual_liquidation: Option<bool>,
-    #[serde(rename = "UseManualLiquidationForIlliquidMarkets", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "UseManualLiquidationForIlliquidMarkets",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub use_manual_liquidation_for_illiquid_markets: Option<bool>,
-    #[serde(rename = "SendAccountEmail", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "SendAccountEmail",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub send_account_email: Option<bool>,
-    #[serde(rename = "SendOfficeEmail", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "SendOfficeEmail",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub send_office_email: Option<bool>,
 }
 
