@@ -91,6 +91,7 @@ QuoteFull, Depth/DepthLevel, TradeBar, TickBar, TimeBar, VolumeBar
 - Use builders for complex request construction (e.g., `OrderRequestBuilder`).
 - Avoid `unwrap()`/`expect()` in library code. Reserve for tests only.
 - Use `#[must_use]` on functions returning values that shouldn't be silently dropped.
+- Never derive `Debug` on types holding secrets (credentials, tokens). Use manual impls that redact sensitive fields.
 
 ### Performance
 - Minimize allocations on the hot path (streaming message deserialization).
@@ -98,11 +99,13 @@ QuoteFull, Depth/DepthLevel, TradeBar, TickBar, TimeBar, VolumeBar
 - Prefer `Bytes` / `&[u8]` for WebSocket frame handling.
 - Connection pooling and keep-alive for HTTP client.
 - Pre-allocate buffers for expected message sizes.
+- Cache per-connection state (e.g., auth headers) at construction time, not per-request.
 
 ### Error Handling
 - Define `Error` enum in `error.rs` with variants for: HTTP, WebSocket, Auth, Deserialization, Api (status + message), Timeout.
 - Map API error responses (400, 401, 403, 429, 500) to typed variants with status code and body.
 - Never panic. Never `unwrap()` outside tests.
+- Library `Error` must not include application-only concerns (e.g., `env::VarError`). Examples use `Box<dyn Error>`.
 
 ### Testing
 - Aim for 80%+ coverage.
@@ -114,3 +117,7 @@ QuoteFull, Depth/DepthLevel, TradeBar, TickBar, TimeBar, VolumeBar
 - All public types and methods get rustdoc with inline examples.
 - `examples/` folder has runnable examples for each API domain, suitable for copy-paste.
 - Examples use `#[tokio::main]` and show error handling.
+- Keep doc examples in sync with actual API types. Run `cargo test --doc` to verify.
+
+### API Notes
+- Auth requires all three fields: username, password, and apiKey (spec says optional, but API rejects without all three).

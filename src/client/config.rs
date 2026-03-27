@@ -1,3 +1,5 @@
+use hyper::header::{AUTHORIZATION, HeaderMap, HeaderValue};
+
 use crate::error::{Error, Result};
 
 use super::rest::auth;
@@ -7,11 +9,21 @@ const DEMO_BASE_URL: &str = "https://demo.ironbeamapi.com/v2";
 const LIVE_BASE_URL: &str = "https://live.ironbeamapi.com/v2";
 
 /// Authentication credentials.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Credentials {
     pub username: String,
     pub password: String,
     pub api_key: String,
+}
+
+impl std::fmt::Debug for Credentials {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Credentials")
+            .field("username", &self.username)
+            .field("password", &"***")
+            .field("api_key", &"***")
+            .finish()
+    }
 }
 
 /// Builder for constructing and connecting a [`Client`].
@@ -65,12 +77,19 @@ impl ClientBuilder {
             .credentials
             .ok_or_else(|| Error::Auth("credentials not set".into()))?;
 
+        let _ = rustls::crypto::ring::default_provider().install_default();
         let http = HttpClient::new();
         let token = auth::authenticate(&http, &self.base_url, &credentials).await?;
+
+        let mut auth_headers = HeaderMap::new();
+        let value = HeaderValue::from_str(&format!("Bearer {}", token))
+            .map_err(|e| Error::Other(e.to_string()))?;
+        auth_headers.insert(AUTHORIZATION, value);
 
         Ok(Client {
             base_url: self.base_url,
             token,
+            auth_headers,
             http,
         })
     }

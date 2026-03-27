@@ -1,4 +1,5 @@
 use std::env;
+use std::error::Error;
 
 use ironbeam_rs::client::{Client, Credentials};
 
@@ -10,7 +11,7 @@ use ironbeam_rs::client::{Client, Credentials};
 /// cargo run --example all_accounts
 /// ```
 #[tokio::main]
-async fn main() -> ironbeam_rs::error::Result<()> {
+async fn main() -> Result<(), Box<dyn Error>> {
     let client = Client::new()
         .credentials(Credentials {
             username: env::var("IRONBEAM_USERNAME")?,

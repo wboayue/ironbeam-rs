@@ -21,9 +21,9 @@ pub struct HttpClient {
 
 impl HttpClient {
     /// Create a new HTTP client with TLS, connection pooling, and keep-alive.
+    ///
+    /// Caller must ensure a rustls `CryptoProvider` is installed before calling.
     pub fn new() -> Self {
-        let _ = rustls::crypto::ring::default_provider().install_default();
-
         let https = hyper_rustls::HttpsConnectorBuilder::new()
             .with_webpki_roots()
             .https_only()

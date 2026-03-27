@@ -1,5 +1,3 @@
-use std::env;
-
 /// Crate-level error type.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -20,9 +18,6 @@ pub enum Error {
 
     #[error("invalid uri: {0}")]
     InvalidUri(#[from] hyper::http::uri::InvalidUri),
-
-    #[error("env: {0}")]
-    Env(#[from] env::VarError),
 
     #[error("{0}")]
     Other(String),
