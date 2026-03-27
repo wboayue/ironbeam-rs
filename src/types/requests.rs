@@ -8,13 +8,12 @@ pub struct AuthorizationRequest {
     /// Username.
     pub username: String,
 
-    /// Password (optional if apiKey provided).
-    #[serde(default)]
-    pub password: Option<String>,
+    /// Password.
+    pub password: String,
 
-    /// API key (optional if password provided).
-    #[serde(rename = "apiKey", default)]
-    pub api_key: Option<String>,
+    /// API key.
+    #[serde(rename = "apiKey")]
+    pub api_key: String,
 }
 
 /// Place order request.
@@ -269,8 +268,8 @@ mod tests {
     fn auth_request_serialize() {
         let req = AuthorizationRequest {
             username: "user1".into(),
-            password: None,
-            api_key: Some("key123".into()),
+            password: "pass1".into(),
+            api_key: "key123".into(),
         };
         let json = serde_json::to_string(&req).unwrap();
         assert!(json.contains("\"apiKey\":\"key123\""));

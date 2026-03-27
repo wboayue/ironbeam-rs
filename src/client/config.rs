@@ -8,9 +8,10 @@ const LIVE_BASE_URL: &str = "https://live.ironbeamapi.com/v2";
 
 /// Authentication credentials.
 #[derive(Debug, Clone)]
-pub enum Credentials {
-    ApiKey { username: String, api_key: String },
-    Password { username: String, password: String },
+pub struct Credentials {
+    pub username: String,
+    pub password: String,
+    pub api_key: String,
 }
 
 /// Builder for constructing and connecting a [`Client`].

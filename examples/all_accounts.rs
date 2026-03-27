@@ -4,7 +4,7 @@ use ironbeam_rs::client::{Client, Credentials};
 
 /// List all accounts for the authenticated trader.
 ///
-/// Set IRONBEAM_USERNAME and IRONBEAM_API_KEY environment variables before running:
+/// Set IRONBEAM_USERNAME, IRONBEAM_PASSWORD, and IRONBEAM_API_KEY environment variables before running:
 ///
 /// ```sh
 /// cargo run --example all_accounts
@@ -12,8 +12,9 @@ use ironbeam_rs::client::{Client, Credentials};
 #[tokio::main]
 async fn main() -> ironbeam_rs::error::Result<()> {
     let client = Client::new()
-        .credentials(Credentials::ApiKey {
+        .credentials(Credentials {
             username: env::var("IRONBEAM_USERNAME")?,
+            password: env::var("IRONBEAM_PASSWORD")?,
             api_key: env::var("IRONBEAM_API_KEY")?,
         })
         .demo()

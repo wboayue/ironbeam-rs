@@ -12,17 +12,10 @@ pub async fn authenticate(
     base_url: &str,
     credentials: &Credentials,
 ) -> Result<String> {
-    let request = match credentials {
-        Credentials::ApiKey { username, api_key } => AuthorizationRequest {
-            username: username.clone(),
-            password: None,
-            api_key: Some(api_key.clone()),
-        },
-        Credentials::Password { username, password } => AuthorizationRequest {
-            username: username.clone(),
-            password: Some(password.clone()),
-            api_key: None,
-        },
+    let request = AuthorizationRequest {
+        username: credentials.username.clone(),
+        password: credentials.password.clone(),
+        api_key: credentials.api_key.clone(),
     };
 
     let uri = format!("{base_url}/auth").parse()?;
