@@ -27,3 +27,6 @@ target
 Cargo.lock
 .env
 
+# Coverage output
+/target/llvm-cov/
+
