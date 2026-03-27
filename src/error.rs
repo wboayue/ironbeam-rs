@@ -46,3 +46,38 @@ pub enum Error {
 
 /// Crate-level Result alias.
 pub type Result<T> = std::result::Result<T, Error>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_api_error_prefers_error1() {
+        let body = br#"{"error1":"Unauthorized","message":"bad creds"}"#;
+        assert_eq!(parse_api_error(body), "Unauthorized");
+    }
+
+    #[test]
+    fn parse_api_error_falls_back_to_message() {
+        let body = br#"{"message":"something went wrong"}"#;
+        assert_eq!(parse_api_error(body), "something went wrong");
+    }
+
+    #[test]
+    fn parse_api_error_skips_empty_error1() {
+        let body = br#"{"error1":"","message":"fallback"}"#;
+        assert_eq!(parse_api_error(body), "fallback");
+    }
+
+    #[test]
+    fn parse_api_error_raw_body_on_invalid_json() {
+        let body = b"not json at all";
+        assert_eq!(parse_api_error(body), "not json at all");
+    }
+
+    #[test]
+    fn parse_api_error_raw_body_when_no_fields() {
+        let body = br#"{"other":"field"}"#;
+        assert_eq!(parse_api_error(body), r#"{"other":"field"}"#);
+    }
+}

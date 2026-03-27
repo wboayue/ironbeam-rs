@@ -25,5 +25,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let accounts = client.all_accounts().await?;
     println!("Accounts: {accounts:?}");
 
+    client.logout().await?;
+
     Ok(())
 }

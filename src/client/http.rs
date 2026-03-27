@@ -118,6 +118,7 @@ pub(crate) mod mock {
     pub struct RecordedRequest {
         pub method: &'static str,
         pub uri: Uri,
+        pub headers: HeaderMap,
         pub body: Bytes,
     }
 
@@ -171,10 +172,11 @@ pub(crate) mod mock {
     }
 
     impl HttpTransport for MockHttp {
-        async fn get(&self, uri: Uri, _headers: &HeaderMap) -> Result<(StatusCode, Bytes)> {
+        async fn get(&self, uri: Uri, headers: &HeaderMap) -> Result<(StatusCode, Bytes)> {
             self.requests.lock().unwrap().push(RecordedRequest {
                 method: "GET",
                 uri,
+                headers: headers.clone(),
                 body: Bytes::new(),
             });
             let r = self.next_response();
@@ -185,11 +187,12 @@ pub(crate) mod mock {
             &self,
             uri: Uri,
             body: Bytes,
-            _headers: &HeaderMap,
+            headers: &HeaderMap,
         ) -> Result<(StatusCode, Bytes)> {
             self.requests.lock().unwrap().push(RecordedRequest {
                 method: "POST",
                 uri,
+                headers: headers.clone(),
                 body,
             });
             let r = self.next_response();

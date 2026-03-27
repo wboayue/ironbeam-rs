@@ -87,7 +87,17 @@ mod tests {
     use crate::client::http::mock::{MockHttp, MockResponse};
     use crate::error::Error;
 
+    use crate::client::config::Credentials;
+
     use super::*;
+
+    fn test_credentials() -> Credentials {
+        Credentials {
+            username: "user".into(),
+            password: "pass".into(),
+            api_key: "key123".into(),
+        }
+    }
 
     fn test_client(mock: MockHttp) -> Client<MockHttp> {
         Client {
@@ -155,5 +165,84 @@ mod tests {
         assert_eq!(reqs.len(), 1);
         assert_eq!(reqs[0].method, "POST");
         assert!(reqs[0].uri.to_string().contains("/logout"));
+    }
+
+    // --- authenticate tests ---
+
+    #[tokio::test]
+    async fn authenticate_returns_token() {
+        let mock = MockHttp::new(vec![MockResponse::ok(
+            r#"{"status":"OK","token":"tok_abc"}"#,
+        )]);
+
+        let token = authenticate(&mock, "http://test", &test_credentials())
+            .await
+            .unwrap();
+
+        assert_eq!(token, "tok_abc");
+        let reqs = mock.recorded_requests();
+        assert_eq!(reqs[0].method, "POST");
+        assert!(reqs[0].uri.to_string().ends_with("/auth"));
+    }
+
+    #[tokio::test]
+    async fn authenticate_sends_credentials_in_body() {
+        let mock = MockHttp::new(vec![MockResponse::ok(
+            r#"{"status":"OK","token":"t"}"#,
+        )]);
+
+        authenticate(&mock, "http://test", &test_credentials())
+            .await
+            .unwrap();
+
+        let reqs = mock.recorded_requests();
+        let body: serde_json::Value = serde_json::from_slice(&reqs[0].body).unwrap();
+        assert_eq!(body["username"], "user");
+        assert_eq!(body["password"], "pass");
+        assert_eq!(body["apiKey"], "key123");
+    }
+
+    #[tokio::test]
+    async fn authenticate_http_error() {
+        let mock = MockHttp::new(vec![MockResponse::error(
+            StatusCode::FORBIDDEN,
+            r#"{"error1":"Forbidden"}"#,
+        )]);
+
+        let err = authenticate(&mock, "http://test", &test_credentials())
+            .await
+            .unwrap_err();
+
+        assert!(matches!(err, Error::Api { status: 403, .. }));
+    }
+
+    #[tokio::test]
+    async fn authenticate_error_status_in_body() {
+        let mock = MockHttp::new(vec![MockResponse::ok(
+            r#"{"status":"ERROR","message":"invalid credentials"}"#,
+        )]);
+
+        let err = authenticate(&mock, "http://test", &test_credentials())
+            .await
+            .unwrap_err();
+
+        match err {
+            Error::Auth(msg) => assert_eq!(msg, "invalid credentials"),
+            other => panic!("expected Auth error, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn authenticate_missing_token() {
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"status":"OK"}"#)]);
+
+        let err = authenticate(&mock, "http://test", &test_credentials())
+            .await
+            .unwrap_err();
+
+        match err {
+            Error::Auth(msg) => assert!(msg.contains("no token")),
+            other => panic!("expected Auth error, got {other:?}"),
+        }
     }
 }

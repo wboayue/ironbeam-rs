@@ -112,6 +112,13 @@ QuoteFull, Depth/DepthLevel, TradeBar, TickBar, TimeBar, VolumeBar
 - Unit tests inline (`#[cfg(test)]` modules) for serde round-trips and business logic.
 - Integration tests in `tests/` using recorded API responses (no live calls in CI).
 - All public methods must have rustdoc with `# Examples` showing async usage.
+- Use `MockHttp` (`src/client/http.rs::mock`) for all HTTP tests — no live calls.
+  - Pre-load canned responses: `MockHttp::new(vec![MockResponse::ok(body), ...])`.
+  - Responses are consumed FIFO; empty queue panics (catches unexpected calls).
+  - Inspect after: `mock.recorded_requests()` returns `Vec<RecordedRequest>` with method, uri, headers, body.
+- Build test clients with `Client { base_url, auth_headers, http: mock, is_logged_out: AtomicBool::new(false) }`.
+- Test each error branch: HTTP-level errors (non-2xx → `Error::Api`), body-level errors (status field → `Error::Auth`), malformed JSON → `Error::Json`.
+- Verify auth headers are forwarded by asserting on `recorded_requests()[n].headers`.
 
 ### Documentation
 - All public types and methods get rustdoc with inline examples.
