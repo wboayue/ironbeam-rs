@@ -129,12 +129,14 @@ pub(crate) async fn message_loop<W: WsTransport>(
     mut ws: W,
     tx: mpsc::Sender<Result<StreamEvent>>,
     mut shutdown_rx: watch::Receiver<bool>,
+    stream_id: String,
 ) {
     loop {
         tokio::select! {
             biased;
 
             _ = shutdown_rx.changed() => {
+                tracing::debug!(stream_id = %stream_id, "shutdown signal received");
                 let _ = ws.write_close().await;
                 return;
             }
@@ -146,14 +148,15 @@ pub(crate) async fn message_loop<W: WsTransport>(
                             Ok(resp) => {
                                 for event in resp.into_events() {
                                     if tx.send(Ok(event)).await.is_err() {
-                                        return; // receiver dropped
+                                        tracing::debug!(stream_id = %stream_id, "receiver dropped, stopping message loop");
+                                        return;
                                     }
                                 }
                             }
                             Err(e) => {
-                                tracing::error!("Failed to parse message: {e}");
+                                tracing::warn!(stream_id = %stream_id, error = %e, "failed to parse message");
                                 if let Ok(raw) = std::str::from_utf8(&payload) {
-                                    tracing::error!("Raw payload: {raw}");
+                                    tracing::debug!(stream_id = %stream_id, payload = %raw, "unparseable message");
                                 }
                                 let _ = tx.send(Err(Error::Json(e))).await;
                             }
@@ -161,10 +164,12 @@ pub(crate) async fn message_loop<W: WsTransport>(
                     }
                     Ok(WsMessage::Close(reason)) => {
                         let msg = reason.unwrap_or_else(|| "connection closed by server".into());
+                        tracing::warn!(stream_id = %stream_id, reason = %msg, "server closed websocket");
                         let _ = tx.send(Err(Error::WebSocket(msg))).await;
                         return;
                     }
                     Err(e) => {
+                        tracing::error!(stream_id = %stream_id, error = %e, "websocket read error");
                         let _ = tx.send(Err(e)).await;
                         return;
                     }
@@ -280,7 +285,7 @@ mod tests {
         let (tx, mut rx) = mpsc::channel(16);
         let (_shutdown_tx, shutdown_rx) = watch::channel(false);
 
-        tokio::spawn(message_loop(ws, tx, shutdown_rx));
+        tokio::spawn(message_loop(ws, tx, shutdown_rx, "test".into()));
 
         let event = rx.recv().await.unwrap().unwrap();
         assert!(matches!(event, StreamEvent::Quotes(..)));
@@ -302,7 +307,7 @@ mod tests {
         let (tx, mut rx) = mpsc::channel(16);
         let (_shutdown_tx, shutdown_rx) = watch::channel(false);
 
-        tokio::spawn(message_loop(ws, tx, shutdown_rx));
+        tokio::spawn(message_loop(ws, tx, shutdown_rx, "test".into()));
 
         // First event: JSON error
         let event = rx.recv().await.unwrap();
@@ -323,7 +328,7 @@ mod tests {
         let (tx, mut rx) = mpsc::channel(16);
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
-        let handle = tokio::spawn(message_loop(ws, tx, shutdown_rx));
+        let handle = tokio::spawn(message_loop(ws, tx, shutdown_rx, "test".into()));
 
         // Signal shutdown before any frames
         let _ = shutdown_tx.send(true);

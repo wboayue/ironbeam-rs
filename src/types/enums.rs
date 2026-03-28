@@ -1,6 +1,48 @@
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
+/// Serde visitor that accepts both integer and string representations.
+///
+/// Used by [`dual_format_enum!`] to keep the per-enum macro expansion small.
+struct DualFormatVisitor<T: Copy + 'static> {
+    type_name: &'static str,
+    int_map: &'static [(u64, T)],
+    str_map: &'static [(&'static str, T)],
+}
+
+impl<'de, T: Copy> serde::de::Visitor<'de> for DualFormatVisitor<T> {
+    type Value = T;
+
+    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "a string or integer {}", self.type_name)
+    }
+
+    fn visit_u64<E: serde::de::Error>(self, v: u64) -> std::result::Result<T, E> {
+        for &(k, val) in self.int_map {
+            if k == v {
+                return Ok(val);
+            }
+        }
+        Err(E::custom(format!("unknown {} integer: {}", self.type_name, v)))
+    }
+
+    fn visit_i64<E: serde::de::Error>(self, v: i64) -> std::result::Result<T, E> {
+        let v = u64::try_from(v).map_err(|_| {
+            E::custom(format!("negative {}: {}", self.type_name, v))
+        })?;
+        self.visit_u64(v)
+    }
+
+    fn visit_str<E: serde::de::Error>(self, v: &str) -> std::result::Result<T, E> {
+        for &(k, val) in self.str_map {
+            if k == v {
+                return Ok(val);
+            }
+        }
+        Err(E::custom(format!("unknown {} string: {}", self.type_name, v)))
+    }
+}
+
 /// Generate a dual-format enum that deserializes from both strings (REST) and
 /// integers (streaming). Serialization always uses the string form.
 macro_rules! dual_format_enum {
@@ -21,42 +63,14 @@ macro_rules! dual_format_enum {
             where
                 D: serde::Deserializer<'de>,
             {
-                struct Visitor;
+                static INT_MAP: &[(u64, $Name)] = &[$( ($int, $Name::$Variant), )+];
+                static STR_MAP: &[(&str, $Name)] = &[$( ($str, $Name::$Variant), )+];
 
-                impl<'de> serde::de::Visitor<'de> for Visitor {
-                    type Value = $Name;
-
-                    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                        f.write_str(concat!("a string or integer ", stringify!($Name)))
-                    }
-
-                    fn visit_u64<E: serde::de::Error>(self, v: u64) -> std::result::Result<$Name, E> {
-                        match v {
-                            $( $int => Ok($Name::$Variant), )+
-                            _ => Err(E::custom(format!(
-                                concat!("unknown ", stringify!($Name), " integer: {}"), v
-                            ))),
-                        }
-                    }
-
-                    fn visit_i64<E: serde::de::Error>(self, v: i64) -> std::result::Result<$Name, E> {
-                        let v = u64::try_from(v).map_err(|_| E::custom(format!(
-                            concat!("negative ", stringify!($Name), ": {}"), v
-                        )))?;
-                        self.visit_u64(v)
-                    }
-
-                    fn visit_str<E: serde::de::Error>(self, v: &str) -> std::result::Result<$Name, E> {
-                        match v {
-                            $( $str => Ok($Name::$Variant), )+
-                            _ => Err(E::custom(format!(
-                                concat!("unknown ", stringify!($Name), " string: {}"), v
-                            ))),
-                        }
-                    }
-                }
-
-                deserializer.deserialize_any(Visitor)
+                deserializer.deserialize_any(DualFormatVisitor {
+                    type_name: stringify!($Name),
+                    int_map: INT_MAP,
+                    str_map: STR_MAP,
+                })
             }
         }
     };

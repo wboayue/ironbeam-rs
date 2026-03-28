@@ -13,7 +13,7 @@ pub(crate) enum MarketFeed {
 }
 
 impl MarketFeed {
-    fn as_str(&self) -> &'static str {
+    pub(crate) fn as_str(&self) -> &'static str {
         match self {
             MarketFeed::Quotes => "quotes",
             MarketFeed::Depths => "depths",
@@ -31,7 +31,7 @@ pub(crate) enum BarKind {
 }
 
 impl BarKind {
-    fn as_str(&self) -> &'static str {
+    pub(crate) fn as_str(&self) -> &'static str {
         match self {
             BarKind::Trade => "tradeBars",
             BarKind::Tick => "tickBars",

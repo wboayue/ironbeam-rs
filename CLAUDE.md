@@ -113,6 +113,18 @@ Pattern: `#[serde(rename = "s")] pub symbol: Symbol` — always use descriptive 
 - Never panic. Never `unwrap()` outside tests.
 - Library `Error` must not include application-only concerns (e.g., `env::VarError`). Examples use `Box<dyn Error>`.
 
+### Logging
+- Use `tracing` with structured fields, not string interpolation. Prefer `tracing::info!(stream_id = %id, "msg")` over `tracing::info!("msg for {id}")`.
+- **Level guide:**
+  - `error!` — transport/infrastructure failures that terminate an operation (WebSocket read error, TLS failure). Something is broken.
+  - `warn!` — recoverable issues that may need investigation (parse failures, server-initiated disconnects, failed background cleanup).
+  - `info!` — lifecycle events and state changes (authenticated, stream connected/closed, subscribe/unsubscribe). One line per operation, not per message.
+  - `debug!` — internal details useful during development (raw payloads, shutdown signals, unexpected but harmless opcodes, config fallbacks).
+- **Never log at `info!` or above on the hot path** (per-message processing). Parse/dispatch in the message loop should only log on errors.
+- **Always include correlation fields** (`stream_id`, `indicator_id`) on stream-related logs so messages from concurrent streams can be distinguished.
+- **Never log secrets** (tokens, passwords, API keys). Auth headers are redacted in `Debug` impls; keep it that way.
+- No logging in type/serde code. Logging belongs in client/transport layers only.
+
 ### Testing
 - Aim for 80%+ coverage.
 - Unit tests inline (`#[cfg(test)]` modules) for serde round-trips and business logic.

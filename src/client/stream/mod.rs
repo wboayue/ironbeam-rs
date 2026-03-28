@@ -61,17 +61,19 @@ impl<'a, H: HttpTransport> StreamBuilder<'a, H> {
         // 1. Create stream session via REST.
         let resp: StreamIdResponse = self.client.get("/stream/create").await?;
         let stream_id = resp.stream_id;
+        tracing::info!(stream_id = %stream_id, "stream session created");
 
         // 2. Extract bearer token for WebSocket URL.
         let token = extract_token(&self.client.auth_headers)?;
 
         // 3. Open WebSocket connection.
         let ws = connection::connect(&self.client.base_url, &stream_id, &token).await?;
+        tracing::info!(stream_id = %stream_id, "websocket connected");
 
         // 4. Spawn message loop.
         let (tx, rx) = mpsc::channel(self.channel_capacity);
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
-        let task = tokio::spawn(connection::message_loop(ws, tx, shutdown_rx));
+        let task = tokio::spawn(connection::message_loop(ws, tx, shutdown_rx, stream_id.clone()));
 
         Ok(StreamHandle {
             stream_id,
@@ -159,10 +161,12 @@ impl<H: HttpTransport> StreamHandle<H> {
 
     /// Gracefully close the stream and await the message loop.
     pub async fn close(mut self) -> Result<()> {
+        tracing::info!(stream_id = %self.stream_id, "closing stream");
         let _ = self.shutdown_tx.send(true);
         if let Some(task) = self.task.take() {
             task.await.map_err(|e| Error::WebSocket(e.to_string()))?;
         }
+        tracing::info!(stream_id = %self.stream_id, "stream closed");
         Ok(())
     }
 
@@ -175,6 +179,7 @@ impl<H: HttpTransport> StreamHandle<H> {
     // -- helpers ------------------------------------------------------------
 
     async fn sub_market(&self, feed: MarketFeed, symbols: &[&str]) -> Result<()> {
+        tracing::info!(stream_id = %self.stream_id, feed = feed.as_str(), ?symbols, "subscribing");
         subscriptions::subscribe_market(
             &self.http, &self.base_url, &self.auth_headers, feed, &self.stream_id, symbols,
         )
@@ -182,6 +187,7 @@ impl<H: HttpTransport> StreamHandle<H> {
     }
 
     async fn unsub_market(&self, feed: MarketFeed, symbols: &[&str]) -> Result<()> {
+        tracing::info!(stream_id = %self.stream_id, feed = feed.as_str(), ?symbols, "unsubscribing");
         subscriptions::unsubscribe_market(
             &self.http, &self.base_url, &self.auth_headers, feed, &self.stream_id, symbols,
         )
@@ -193,6 +199,7 @@ impl<H: HttpTransport> StreamHandle<H> {
         kind: BarKind,
         req: &SubscribeBarsRequest,
     ) -> Result<IndicatorSubscribeResponse> {
+        tracing::info!(stream_id = %self.stream_id, kind = kind.as_str(), symbol = %req.symbol, "subscribing indicator");
         subscriptions::subscribe_indicator(
             &self.http, &self.base_url, &self.auth_headers, kind, &self.stream_id, req,
         )
@@ -333,6 +340,7 @@ impl<H: HttpTransport> StreamHandle<H> {
     ///
     /// The `indicator_id` is returned by the `subscribe_*_bars` methods.
     pub async fn unsubscribe_indicator(&self, indicator_id: &str) -> Result<()> {
+        tracing::info!(stream_id = %self.stream_id, indicator_id, "unsubscribing indicator");
         subscriptions::unsubscribe_indicator(
             &self.http,
             &self.base_url,

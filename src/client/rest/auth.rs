@@ -41,8 +41,11 @@ pub async fn authenticate(
         ));
     }
 
-    resp.token
-        .ok_or_else(|| Error::Auth("no token in response".into()))
+    let token = resp.token
+        .ok_or_else(|| Error::Auth("no token in response".into()))?;
+
+    tracing::info!("authenticated successfully");
+    Ok(token)
 }
 
 /// Invalidate the bearer token.
@@ -64,6 +67,7 @@ pub async fn logout(http: &impl HttpTransport, base_url: &str, headers: &HeaderM
         ));
     }
 
+    tracing::info!("logged out");
     Ok(())
 }
 
