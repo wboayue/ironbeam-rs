@@ -1,7 +1,8 @@
 use std::sync::atomic::Ordering;
 
 use bytes::Bytes;
-use hyper::header::HeaderMap;
+use hyper::Method;
+use hyper::header::{CONTENT_TYPE, HeaderMap, HeaderValue};
 
 use crate::client::Client;
 use crate::client::config::Credentials;
@@ -24,7 +25,9 @@ pub async fn authenticate(
     let uri = format!("{base_url}/auth").parse()?;
     let body = Bytes::from(serde_json::to_vec(&request)?);
 
-    let (status, resp_bytes) = http.post(uri, body, &HeaderMap::new()).await?;
+    let mut headers = HeaderMap::new();
+    headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    let (status, resp_bytes) = http.send(Method::POST, uri, Some(body), &headers).await?;
 
     if !status.is_success() {
         return Err(Error::Api {
@@ -41,7 +44,8 @@ pub async fn authenticate(
         ));
     }
 
-    let token = resp.token
+    let token = resp
+        .token
         .ok_or_else(|| Error::Auth("no token in response".into()))?;
 
     tracing::info!("authenticated successfully");
@@ -49,18 +53,9 @@ pub async fn authenticate(
 }
 
 /// Invalidate the bearer token.
-pub async fn logout(http: &impl HttpTransport, base_url: &str, headers: &HeaderMap) -> Result<()> {
-    let uri = format!("{base_url}/logout").parse()?;
-    let (status, resp_bytes) = http.post(uri, Bytes::from_static(b"{}"), headers).await?;
+pub async fn logout<H: HttpTransport>(request: &crate::client::RequestHelper<H>) -> Result<()> {
+    let resp: SuccessResponse = request.post("/logout", &serde_json::json!({})).await?;
 
-    if !status.is_success() {
-        return Err(Error::Api {
-            status: status.as_u16(),
-            message: parse_api_error(&resp_bytes),
-        });
-    }
-
-    let resp: SuccessResponse = serde_json::from_slice(&resp_bytes)?;
     if resp.status != ResponseStatus::Ok {
         return Err(Error::Auth(
             resp.message.unwrap_or_else(|| "logout failed".into()),
@@ -87,7 +82,7 @@ impl<H: HttpTransport> Client<H> {
     /// # }
     /// ```
     pub async fn logout(&self) -> Result<()> {
-        logout(&self.request.http, &self.request.base_url, &self.request.auth_headers).await?;
+        logout(&self.request).await?;
         self.is_logged_out.store(true, Ordering::Release);
         Ok(())
     }
@@ -127,8 +122,12 @@ mod tests {
         assert!(client.is_logged_out.load(Ordering::Acquire));
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs.len(), 1);
-        assert_eq!(reqs[0].method, "POST");
+        assert_eq!(reqs[0].method, hyper::Method::POST);
         assert!(reqs[0].uri.to_string().contains("/logout"));
+        assert_eq!(
+            reqs[0].headers.get(hyper::header::CONTENT_TYPE).unwrap(),
+            "application/json"
+        );
     }
 
     #[tokio::test]
@@ -174,7 +173,7 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         let reqs = requests.lock().unwrap();
         assert_eq!(reqs.len(), 1);
-        assert_eq!(reqs[0].method, "POST");
+        assert_eq!(reqs[0].method, hyper::Method::POST);
         assert!(reqs[0].uri.to_string().contains("/logout"));
     }
 
@@ -192,15 +191,13 @@ mod tests {
 
         assert_eq!(token, "tok_abc");
         let reqs = mock.recorded_requests();
-        assert_eq!(reqs[0].method, "POST");
+        assert_eq!(reqs[0].method, hyper::Method::POST);
         assert!(reqs[0].uri.to_string().ends_with("/auth"));
     }
 
     #[tokio::test]
     async fn authenticate_sends_credentials_in_body() {
-        let mock = MockHttp::new(vec![MockResponse::ok(
-            r#"{"status":"OK","token":"t"}"#,
-        )]);
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"status":"OK","token":"t"}"#)]);
 
         authenticate(&mock, "http://test", &test_credentials())
             .await

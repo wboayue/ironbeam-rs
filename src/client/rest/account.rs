@@ -36,16 +36,14 @@ mod tests {
 
     #[tokio::test]
     async fn all_accounts_returns_list() {
-        let mock = MockHttp::new(vec![MockResponse::ok(
-            r#"{"accounts":["ACC1","ACC2"]}"#,
-        )]);
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"accounts":["ACC1","ACC2"]}"#)]);
         let client = test_client_with_auth(mock);
 
         let accounts = client.all_accounts().await.unwrap();
 
         assert_eq!(accounts, vec!["ACC1", "ACC2"]);
         let reqs = client.request.http.recorded_requests();
-        assert_eq!(reqs[0].method, "GET");
+        assert_eq!(reqs[0].method, hyper::Method::GET);
         assert!(reqs[0].uri.to_string().ends_with("/account/getAllAccounts"));
     }
 
@@ -57,7 +55,10 @@ mod tests {
         client.all_accounts().await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
-        assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");
+        assert_eq!(
+            reqs[0].headers.get(AUTHORIZATION).unwrap(),
+            "Bearer tok_test"
+        );
     }
 
     #[tokio::test]

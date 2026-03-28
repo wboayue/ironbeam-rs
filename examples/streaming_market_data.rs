@@ -15,7 +15,9 @@ use ironbeam_rs::client::{Client, Credentials};
 /// Defaults to `quote` if no argument is given.
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    tracing_subscriber::fmt().with_max_level(tracing::Level::DEBUG).init();
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::DEBUG)
+        .init();
 
     let stream_type = env::args().nth(1).unwrap_or_else(|| "quote".into());
 
@@ -58,12 +60,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
         match event? {
             StreamEvent::Quotes(quotes) => {
                 for q in &quotes {
-                    println!("Quote {}: last={:?} bid={:?} ask={:?}", q.symbol, q.last_price, q.bid, q.ask);
+                    println!(
+                        "Quote {}: last={:?} bid={:?} ask={:?}",
+                        q.symbol, q.last_price, q.bid, q.ask
+                    );
                 }
             }
             StreamEvent::Depth(depths) => {
                 for d in &depths {
-                    println!("Depth {}: bids={} asks={}", d.symbol, d.bids.len(), d.asks.len());
+                    println!(
+                        "Depth {}: bids={} asks={}",
+                        d.symbol,
+                        d.bids.len(),
+                        d.asks.len()
+                    );
                 }
             }
             StreamEvent::Trades(trades) => {
@@ -72,7 +82,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
             StreamEvent::Ping(_) => println!("keepalive"),
-            StreamEvent::Notification(r) => println!("notification: {:?} {:?}", r.status, r.message),
+            StreamEvent::Notification(r) => {
+                println!("notification: {:?} {:?}", r.status, r.message)
+            }
             _ => {}
         }
     }

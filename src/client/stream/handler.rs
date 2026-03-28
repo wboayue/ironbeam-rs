@@ -86,7 +86,9 @@ mod tests {
         let sr: StreamResponse = serde_json::from_str(json).unwrap();
         let events: Vec<_> = sr.into_events().collect();
         assert_eq!(events.len(), 1);
-        assert!(matches!(&events[0], StreamEvent::Ping(p) if p.ping.as_deref() == Some("keepalive")));
+        assert!(
+            matches!(&events[0], StreamEvent::Ping(p) if p.ping.as_deref() == Some("keepalive"))
+        );
     }
 
     #[test]

@@ -9,7 +9,8 @@ pub use http::HttpTransport;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use bytes::Bytes;
-use hyper::header::HeaderMap;
+use hyper::Method;
+use hyper::header::{CONTENT_TYPE, HeaderMap, HeaderValue};
 use serde::de::DeserializeOwned;
 
 use crate::error::{Error, Result, parse_api_error};
@@ -30,46 +31,24 @@ pub(crate) struct RequestHelper<H: HttpTransport> {
 }
 
 impl<H: HttpTransport> RequestHelper<H> {
-    /// Send an authenticated GET request and deserialize the JSON response.
-    pub(crate) async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
-        let uri = format!("{}{path}", self.base_url).parse()?;
-        let (status, body) = self.http.get(uri, &self.auth_headers).await?;
-
-        if !status.is_success() {
-            return Err(Error::Api {
-                status: status.as_u16(),
-                message: parse_api_error(&body),
-            });
-        }
-
-        Ok(serde_json::from_slice(&body)?)
-    }
-
-    /// Send an authenticated DELETE request and deserialize the JSON response.
-    pub(crate) async fn delete<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
-        let uri = format!("{}{path}", self.base_url).parse()?;
-        let (status, body) = self.http.delete(uri, &self.auth_headers).await?;
-
-        if !status.is_success() {
-            return Err(Error::Api {
-                status: status.as_u16(),
-                message: parse_api_error(&body),
-            });
-        }
-
-        Ok(serde_json::from_slice(&body)?)
-    }
-
-    /// Send an authenticated POST request with a JSON body and deserialize the response.
-    pub(crate) async fn post<B: serde::Serialize, T: DeserializeOwned>(
+    /// Core HTTP method — all convenience methods delegate here.
+    async fn send<T: DeserializeOwned>(
         &self,
+        method: Method,
         path: &str,
-        body: &B,
+        body: Option<Bytes>,
     ) -> Result<T> {
         let uri = format!("{}{path}", self.base_url).parse()?;
-        let body = Bytes::from(serde_json::to_vec(body)?);
 
-        let (status, resp_body) = self.http.post(uri, body, &self.auth_headers).await?;
+        let (status, resp_body) = if body.is_some() {
+            let mut headers = self.auth_headers.clone();
+            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+            self.http.send(method, uri, body, &headers).await?
+        } else {
+            self.http
+                .send(method, uri, body, &self.auth_headers)
+                .await?
+        };
 
         if !status.is_success() {
             return Err(Error::Api {
@@ -79,6 +58,41 @@ impl<H: HttpTransport> RequestHelper<H> {
         }
 
         Ok(serde_json::from_slice(&resp_body)?)
+    }
+
+    pub(crate) async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
+        self.send(Method::GET, path, None).await
+    }
+
+    pub(crate) async fn post<B: serde::Serialize, T: DeserializeOwned>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<T> {
+        let bytes = Bytes::from(serde_json::to_vec(body)?);
+        self.send(Method::POST, path, Some(bytes)).await
+    }
+
+    pub(crate) async fn put<B: serde::Serialize, T: DeserializeOwned>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<T> {
+        let bytes = Bytes::from(serde_json::to_vec(body)?);
+        self.send(Method::PUT, path, Some(bytes)).await
+    }
+
+    pub(crate) async fn delete<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
+        self.send(Method::DELETE, path, None).await
+    }
+
+    pub(crate) async fn delete_with_body<B: serde::Serialize, T: DeserializeOwned>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<T> {
+        let bytes = Bytes::from(serde_json::to_vec(body)?);
+        self.send(Method::DELETE, path, Some(bytes)).await
     }
 }
 
@@ -133,19 +147,32 @@ impl Client {
 }
 
 impl<H: HttpTransport> Client<H> {
-    /// Send an authenticated GET request and deserialize the JSON response.
     pub(crate) async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
         self.request.get(path).await
     }
 
-    /// Send an authenticated POST request with a JSON body and deserialize the response.
-    #[allow(dead_code)]
     pub(crate) async fn post<B: serde::Serialize, T: DeserializeOwned>(
         &self,
         path: &str,
         body: &B,
     ) -> Result<T> {
         self.request.post(path, body).await
+    }
+
+    pub(crate) async fn put<B: serde::Serialize, T: DeserializeOwned>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<T> {
+        self.request.put(path, body).await
+    }
+
+    pub(crate) async fn delete_with_body<B: serde::Serialize, T: DeserializeOwned>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<T> {
+        self.request.delete_with_body(path, body).await
     }
 }
 
@@ -165,7 +192,7 @@ impl<H: HttpTransport> Drop for Client<H> {
         let req = self.request.clone();
 
         handle.spawn(async move {
-            if let Err(e) = rest::auth::logout(&req.http, &req.base_url, &req.auth_headers).await {
+            if let Err(e) = rest::auth::logout(&req).await {
                 tracing::warn!("logout on drop failed: {e}");
             }
         });
@@ -178,8 +205,8 @@ pub(crate) mod test_support {
 
     use hyper::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 
-    use super::{Client, RequestHelper};
     use super::http::mock::MockHttp;
+    use super::{Client, RequestHelper};
 
     /// Build a test client with no auth headers.
     pub fn test_client(mock: MockHttp) -> Client<MockHttp> {

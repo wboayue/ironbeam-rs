@@ -79,7 +79,10 @@ impl ClientBuilder {
             .credentials
             .ok_or_else(|| Error::Auth("credentials not set".into()))?;
 
-        if rustls::crypto::ring::default_provider().install_default().is_err() {
+        if rustls::crypto::ring::default_provider()
+            .install_default()
+            .is_err()
+        {
             tracing::debug!("rustls CryptoProvider already installed, using existing");
         }
         let http = HttpClient::new();
