@@ -10,7 +10,7 @@ use crate::error::{Error, Result};
 use crate::types::streaming::{IndicatorSubscribeResponse, StreamIdResponse, SubscribeBarsRequest};
 
 use super::http::HttpTransport;
-use super::Client;
+use super::{Client, RequestHelper};
 
 pub use handler::StreamEvent;
 use subscriptions::{BarKind, MarketFeed};
@@ -64,10 +64,10 @@ impl<'a, H: HttpTransport> StreamBuilder<'a, H> {
         tracing::info!(stream_id = %stream_id, "stream session created");
 
         // 2. Extract bearer token for WebSocket URL.
-        let token = extract_token(&self.client.auth_headers)?;
+        let token = extract_token(&self.client.request.auth_headers)?;
 
         // 3. Open WebSocket connection.
-        let ws = match connection::connect(&self.client.base_url, &stream_id, &token).await {
+        let ws = match connection::connect(&self.client.request.base_url, &stream_id, &token).await {
             Ok(ws) => ws,
             Err(e) => {
                 // Stream session created on server but WebSocket failed.
@@ -85,9 +85,7 @@ impl<'a, H: HttpTransport> StreamBuilder<'a, H> {
 
         Ok(StreamHandle {
             stream_id,
-            http: self.client.http.clone(),
-            base_url: self.client.base_url.clone(),
-            auth_headers: self.client.auth_headers.clone(),
+            request: self.client.request.clone(),
             rx,
             shutdown_tx,
             task: Some(task),
@@ -151,9 +149,7 @@ impl<H: HttpTransport> Client<H> {
 /// ```
 pub struct StreamHandle<H: HttpTransport> {
     stream_id: String,
-    http: H,
-    base_url: String,
-    auth_headers: HeaderMap,
+    request: RequestHelper<H>,
     rx: mpsc::Receiver<Result<StreamEvent>>,
     shutdown_tx: watch::Sender<bool>,
     task: Option<JoinHandle<()>>,
@@ -188,18 +184,12 @@ impl<H: HttpTransport> StreamHandle<H> {
 
     async fn sub_market(&self, feed: MarketFeed, symbols: &[&str]) -> Result<()> {
         tracing::info!(stream_id = %self.stream_id, feed = feed.as_str(), ?symbols, "subscribing");
-        subscriptions::subscribe_market(
-            &self.http, &self.base_url, &self.auth_headers, feed, &self.stream_id, symbols,
-        )
-        .await
+        subscriptions::subscribe_market(&self.request, feed, &self.stream_id, symbols).await
     }
 
     async fn unsub_market(&self, feed: MarketFeed, symbols: &[&str]) -> Result<()> {
         tracing::info!(stream_id = %self.stream_id, feed = feed.as_str(), ?symbols, "unsubscribing");
-        subscriptions::unsubscribe_market(
-            &self.http, &self.base_url, &self.auth_headers, feed, &self.stream_id, symbols,
-        )
-        .await
+        subscriptions::unsubscribe_market(&self.request, feed, &self.stream_id, symbols).await
     }
 
     async fn sub_indicator(
@@ -208,10 +198,7 @@ impl<H: HttpTransport> StreamHandle<H> {
         req: &SubscribeBarsRequest,
     ) -> Result<IndicatorSubscribeResponse> {
         tracing::info!(stream_id = %self.stream_id, kind = kind.as_str(), symbol = %req.symbol, "subscribing indicator");
-        subscriptions::subscribe_indicator(
-            &self.http, &self.base_url, &self.auth_headers, kind, &self.stream_id, req,
-        )
-        .await
+        subscriptions::subscribe_indicator(&self.request, kind, &self.stream_id, req).await
     }
 
     // -- Market data subscriptions ------------------------------------------
@@ -349,14 +336,7 @@ impl<H: HttpTransport> StreamHandle<H> {
     /// The `indicator_id` is returned by the `subscribe_*_bars` methods.
     pub async fn unsubscribe_indicator(&self, indicator_id: &str) -> Result<()> {
         tracing::info!(stream_id = %self.stream_id, indicator_id, "unsubscribing indicator");
-        subscriptions::unsubscribe_indicator(
-            &self.http,
-            &self.base_url,
-            &self.auth_headers,
-            &self.stream_id,
-            indicator_id,
-        )
-        .await
+        subscriptions::unsubscribe_indicator(&self.request, &self.stream_id, indicator_id).await
     }
 }
 
@@ -372,7 +352,7 @@ impl<H: HttpTransport> std::fmt::Debug for StreamHandle<H> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("StreamHandle")
             .field("stream_id", &self.stream_id)
-            .field("base_url", &self.base_url)
+            .field("base_url", &self.request.base_url)
             .finish()
     }
 }

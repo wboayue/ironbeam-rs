@@ -15,6 +15,77 @@ use serde::de::DeserializeOwned;
 use crate::error::{Error, Result, parse_api_error};
 use http::HttpClient;
 
+// ---------------------------------------------------------------------------
+// RequestHelper — shared HTTP request logic
+// ---------------------------------------------------------------------------
+
+/// Authenticated HTTP request helper shared by [`Client`] and
+/// [`StreamHandle`](stream::StreamHandle).
+#[derive(Clone)]
+pub(crate) struct RequestHelper<H: HttpTransport> {
+    pub(crate) http: H,
+    pub(crate) base_url: String,
+    /// Cached authorization headers. Contains the bearer token — do not log.
+    pub(crate) auth_headers: HeaderMap,
+}
+
+impl<H: HttpTransport> RequestHelper<H> {
+    /// Send an authenticated GET request and deserialize the JSON response.
+    pub(crate) async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
+        let uri = format!("{}{path}", self.base_url).parse()?;
+        let (status, body) = self.http.get(uri, &self.auth_headers).await?;
+
+        if !status.is_success() {
+            return Err(Error::Api {
+                status: status.as_u16(),
+                message: parse_api_error(&body),
+            });
+        }
+
+        Ok(serde_json::from_slice(&body)?)
+    }
+
+    /// Send an authenticated DELETE request and deserialize the JSON response.
+    pub(crate) async fn delete<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
+        let uri = format!("{}{path}", self.base_url).parse()?;
+        let (status, body) = self.http.delete(uri, &self.auth_headers).await?;
+
+        if !status.is_success() {
+            return Err(Error::Api {
+                status: status.as_u16(),
+                message: parse_api_error(&body),
+            });
+        }
+
+        Ok(serde_json::from_slice(&body)?)
+    }
+
+    /// Send an authenticated POST request with a JSON body and deserialize the response.
+    pub(crate) async fn post<B: serde::Serialize, T: DeserializeOwned>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<T> {
+        let uri = format!("{}{path}", self.base_url).parse()?;
+        let body = Bytes::from(serde_json::to_vec(body)?);
+
+        let (status, resp_body) = self.http.post(uri, body, &self.auth_headers).await?;
+
+        if !status.is_success() {
+            return Err(Error::Api {
+                status: status.as_u16(),
+                message: parse_api_error(&resp_body),
+            });
+        }
+
+        Ok(serde_json::from_slice(&resp_body)?)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Client
+// ---------------------------------------------------------------------------
+
 /// Authenticated Ironbeam API client.
 ///
 /// Constructed via [`Client::builder()`] → [`ClientBuilder`] → [`ClientBuilder::connect()`].
@@ -39,17 +110,14 @@ use http::HttpClient;
 /// # }
 /// ```
 pub struct Client<H: HttpTransport = HttpClient> {
-    pub(crate) base_url: String,
-    /// Cached authorization headers. Contains the bearer token — do not log.
-    pub(crate) auth_headers: HeaderMap,
-    pub(crate) http: H,
+    pub(crate) request: RequestHelper<H>,
     pub(crate) is_logged_out: AtomicBool,
 }
 
 impl<H: HttpTransport> std::fmt::Debug for Client<H> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Client")
-            .field("base_url", &self.base_url)
+            .field("base_url", &self.request.base_url)
             .field("auth_headers", &"[redacted]")
             .field("is_logged_out", &self.is_logged_out)
             .finish()
@@ -67,33 +135,7 @@ impl Client {
 impl<H: HttpTransport> Client<H> {
     /// Send an authenticated GET request and deserialize the JSON response.
     pub(crate) async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
-        let uri = format!("{}{path}", self.base_url).parse()?;
-        let (status, body) = self.http.get(uri, &self.auth_headers).await?;
-
-        if !status.is_success() {
-            return Err(Error::Api {
-                status: status.as_u16(),
-                message: parse_api_error(&body),
-            });
-        }
-
-        Ok(serde_json::from_slice(&body)?)
-    }
-
-    /// Send an authenticated DELETE request and deserialize the JSON response.
-    #[allow(dead_code)]
-    pub(crate) async fn delete<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
-        let uri = format!("{}{path}", self.base_url).parse()?;
-        let (status, body) = self.http.delete(uri, &self.auth_headers).await?;
-
-        if !status.is_success() {
-            return Err(Error::Api {
-                status: status.as_u16(),
-                message: parse_api_error(&body),
-            });
-        }
-
-        Ok(serde_json::from_slice(&body)?)
+        self.request.get(path).await
     }
 
     /// Send an authenticated POST request with a JSON body and deserialize the response.
@@ -103,19 +145,7 @@ impl<H: HttpTransport> Client<H> {
         path: &str,
         body: &B,
     ) -> Result<T> {
-        let uri = format!("{}{path}", self.base_url).parse()?;
-        let body = Bytes::from(serde_json::to_vec(body)?);
-
-        let (status, resp_body) = self.http.post(uri, body, &self.auth_headers).await?;
-
-        if !status.is_success() {
-            return Err(Error::Api {
-                status: status.as_u16(),
-                message: parse_api_error(&resp_body),
-            });
-        }
-
-        Ok(serde_json::from_slice(&resp_body)?)
+        self.request.post(path, body).await
     }
 }
 
@@ -132,12 +162,10 @@ impl<H: HttpTransport> Drop for Client<H> {
             return;
         };
 
-        let http = self.http.clone();
-        let base_url = self.base_url.clone();
-        let headers = self.auth_headers.clone();
+        let req = self.request.clone();
 
         handle.spawn(async move {
-            if let Err(e) = rest::auth::logout(&http, &base_url, &headers).await {
+            if let Err(e) = rest::auth::logout(&req.http, &req.base_url, &req.auth_headers).await {
                 tracing::warn!("logout on drop failed: {e}");
             }
         });
@@ -150,15 +178,17 @@ pub(crate) mod test_support {
 
     use hyper::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 
-    use super::Client;
+    use super::{Client, RequestHelper};
     use super::http::mock::MockHttp;
 
     /// Build a test client with no auth headers.
     pub fn test_client(mock: MockHttp) -> Client<MockHttp> {
         Client {
-            base_url: "http://test".into(),
-            auth_headers: HeaderMap::new(),
-            http: mock,
+            request: RequestHelper {
+                base_url: "http://test".into(),
+                auth_headers: HeaderMap::new(),
+                http: mock,
+            },
             is_logged_out: AtomicBool::new(false),
         }
     }
@@ -168,9 +198,11 @@ pub(crate) mod test_support {
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("Bearer tok_test"));
         Client {
-            base_url: "http://test".into(),
-            auth_headers: headers,
-            http: mock,
+            request: RequestHelper {
+                base_url: "http://test".into(),
+                auth_headers: headers,
+                http: mock,
+            },
             is_logged_out: AtomicBool::new(false),
         }
     }

@@ -87,7 +87,7 @@ impl<H: HttpTransport> Client<H> {
     /// # }
     /// ```
     pub async fn logout(&self) -> Result<()> {
-        logout(&self.http, &self.base_url, &self.auth_headers).await?;
+        logout(&self.request.http, &self.request.base_url, &self.request.auth_headers).await?;
         self.is_logged_out.store(true, Ordering::Release);
         Ok(())
     }
@@ -125,7 +125,7 @@ mod tests {
         client.logout().await.unwrap();
 
         assert!(client.is_logged_out.load(Ordering::Acquire));
-        let reqs = client.http.recorded_requests();
+        let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs.len(), 1);
         assert_eq!(reqs[0].method, "POST");
         assert!(reqs[0].uri.to_string().contains("/logout"));
@@ -150,9 +150,11 @@ mod tests {
         let requests = mock.requests.clone();
 
         let client = Client {
-            base_url: "http://test".into(),
-            auth_headers: HeaderMap::new(),
-            http: mock,
+            request: crate::client::RequestHelper {
+                base_url: "http://test".into(),
+                auth_headers: HeaderMap::new(),
+                http: mock,
+            },
             is_logged_out: AtomicBool::new(true),
         };
 

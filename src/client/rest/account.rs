@@ -44,7 +44,7 @@ mod tests {
         let accounts = client.all_accounts().await.unwrap();
 
         assert_eq!(accounts, vec!["ACC1", "ACC2"]);
-        let reqs = client.http.recorded_requests();
+        let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, "GET");
         assert!(reqs[0].uri.to_string().ends_with("/account/getAllAccounts"));
     }
@@ -56,7 +56,7 @@ mod tests {
 
         client.all_accounts().await.unwrap();
 
-        let reqs = client.http.recorded_requests();
+        let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");
     }
 

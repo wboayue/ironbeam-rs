@@ -1,7 +1,6 @@
-use hyper::header::HeaderMap;
-
+use crate::client::RequestHelper;
 use crate::client::http::HttpTransport;
-use crate::error::{Error, Result, parse_api_error};
+use crate::error::{Error, Result};
 use crate::types::common::SuccessResponse;
 use crate::types::streaming::{IndicatorSubscribeResponse, SubscribeBarsRequest};
 
@@ -43,9 +42,7 @@ impl BarKind {
 
 /// `GET /market/{feed}/{action}/{streamId}?symbols=SYM1,SYM2`
 async fn market_request<H: HttpTransport>(
-    http: &H,
-    base_url: &str,
-    headers: &HeaderMap,
+    request: &RequestHelper<H>,
     feed: MarketFeed,
     action: &str,
     stream_id: &str,
@@ -57,23 +54,14 @@ async fn market_request<H: HttpTransport>(
         .collect::<Vec<_>>()
         .join(",");
     let path = format!(
-        "{base_url}/market/{}/{action}/{stream_id}?symbols={symbols_param}",
+        "/market/{}/{action}/{stream_id}?symbols={symbols_param}",
         feed.as_str()
     );
-    let uri = path.parse()?;
-    let (status, body) = http.get(uri, headers).await?;
 
-    if !status.is_success() {
-        return Err(Error::Api {
-            status: status.as_u16(),
-            message: parse_api_error(&body),
-        });
-    }
-
-    let resp: SuccessResponse = serde_json::from_slice(&body)?;
+    let resp: SuccessResponse = request.get(&path).await?;
     if resp.status != crate::types::ResponseStatus::Ok {
         return Err(Error::Api {
-            status: status.as_u16(),
+            status: 200,
             message: resp.message.unwrap_or_default(),
         });
     }
@@ -83,106 +71,77 @@ async fn market_request<H: HttpTransport>(
 
 /// `GET /market/{feed}/subscribe/{streamId}?symbols=SYM1,SYM2`
 pub(crate) async fn subscribe_market<H: HttpTransport>(
-    http: &H,
-    base_url: &str,
-    headers: &HeaderMap,
+    request: &RequestHelper<H>,
     feed: MarketFeed,
     stream_id: &str,
     symbols: &[&str],
 ) -> Result<()> {
-    market_request(http, base_url, headers, feed, "subscribe", stream_id, symbols).await
+    market_request(request, feed, "subscribe", stream_id, symbols).await
 }
 
 /// `GET /market/{feed}/unsubscribe/{streamId}?symbols=SYM1,SYM2`
 pub(crate) async fn unsubscribe_market<H: HttpTransport>(
-    http: &H,
-    base_url: &str,
-    headers: &HeaderMap,
+    request: &RequestHelper<H>,
     feed: MarketFeed,
     stream_id: &str,
     symbols: &[&str],
 ) -> Result<()> {
-    market_request(http, base_url, headers, feed, "unsubscribe", stream_id, symbols).await
+    market_request(request, feed, "unsubscribe", stream_id, symbols).await
 }
 
 /// `POST /indicator/{streamId}/{barKind}/subscribe`
 pub(crate) async fn subscribe_indicator<H: HttpTransport>(
-    http: &H,
-    base_url: &str,
-    headers: &HeaderMap,
+    request: &RequestHelper<H>,
     kind: BarKind,
     stream_id: &str,
     req: &SubscribeBarsRequest,
 ) -> Result<IndicatorSubscribeResponse> {
     let path = format!(
-        "{base_url}/indicator/{stream_id}/{}/subscribe",
+        "/indicator/{stream_id}/{}/subscribe",
         kind.as_str()
     );
-    let uri = path.parse()?;
-    let body = bytes::Bytes::from(serde_json::to_vec(req)?);
-    let (status, resp_body) = http.post(uri, body, headers).await?;
-
-    if !status.is_success() {
-        return Err(Error::Api {
-            status: status.as_u16(),
-            message: parse_api_error(&resp_body),
-        });
-    }
-
-    Ok(serde_json::from_slice(&resp_body)?)
+    request.post(&path, req).await
 }
 
 /// `DELETE /indicator/{streamId}/unsubscribe/{indicatorId}`
 pub(crate) async fn unsubscribe_indicator<H: HttpTransport>(
-    http: &H,
-    base_url: &str,
-    headers: &HeaderMap,
+    request: &RequestHelper<H>,
     stream_id: &str,
     indicator_id: &str,
 ) -> Result<()> {
-    let path = format!("{base_url}/indicator/{stream_id}/unsubscribe/{indicator_id}");
-    let uri = path.parse()?;
-    let (status, body) = http.delete(uri, headers).await?;
-
-    if !status.is_success() {
-        return Err(Error::Api {
-            status: status.as_u16(),
-            message: parse_api_error(&body),
-        });
-    }
-
+    let path = format!("/indicator/{stream_id}/unsubscribe/{indicator_id}");
+    let _resp: SuccessResponse = request.delete(&path).await?;
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use hyper::header::{AUTHORIZATION, HeaderValue};
+    use hyper::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 
+    use crate::client::RequestHelper;
     use crate::client::http::mock::{MockHttp, MockResponse};
 
     use super::*;
 
-    fn test_headers() -> HeaderMap {
-        let mut h = HeaderMap::new();
-        h.insert(AUTHORIZATION, HeaderValue::from_static("Bearer tok_test"));
-        h
+    fn test_request(mock: MockHttp) -> RequestHelper<MockHttp> {
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, HeaderValue::from_static("Bearer tok_test"));
+        RequestHelper {
+            http: mock,
+            base_url: "http://test".into(),
+            auth_headers: headers,
+        }
     }
 
     #[tokio::test]
     async fn subscribe_quotes_sends_correct_request() {
         let mock = MockHttp::new(vec![MockResponse::ok(r#"{"status":"OK"}"#)]);
-        subscribe_market(
-            &mock,
-            "http://test",
-            &test_headers(),
-            MarketFeed::Quotes,
-            "stream-123",
-            &["XCME:ES.U25", "XCME:NQ.U25"],
-        )
-        .await
-        .unwrap();
+        let req = test_request(mock);
+        subscribe_market(&req, MarketFeed::Quotes, "stream-123", &["XCME:ES.U25", "XCME:NQ.U25"])
+            .await
+            .unwrap();
 
-        let reqs = mock.recorded_requests();
+        let reqs = req.http.recorded_requests();
         assert_eq!(reqs.len(), 1);
         assert_eq!(reqs[0].method, "GET");
         assert_eq!(
@@ -198,18 +157,12 @@ mod tests {
     #[tokio::test]
     async fn unsubscribe_depths_sends_correct_request() {
         let mock = MockHttp::new(vec![MockResponse::ok(r#"{"status":"OK"}"#)]);
-        unsubscribe_market(
-            &mock,
-            "http://test",
-            &test_headers(),
-            MarketFeed::Depths,
-            "stream-456",
-            &["XCME:ES.U25"],
-        )
-        .await
-        .unwrap();
+        let req = test_request(mock);
+        unsubscribe_market(&req, MarketFeed::Depths, "stream-456", &["XCME:ES.U25"])
+            .await
+            .unwrap();
 
-        let reqs = mock.recorded_requests();
+        let reqs = req.http.recorded_requests();
         assert_eq!(reqs[0].method, "GET");
         assert!(reqs[0].uri.to_string().contains("/market/depths/unsubscribe/stream-456"));
     }
@@ -217,18 +170,12 @@ mod tests {
     #[tokio::test]
     async fn subscribe_trades_sends_correct_request() {
         let mock = MockHttp::new(vec![MockResponse::ok(r#"{"status":"OK"}"#)]);
-        subscribe_market(
-            &mock,
-            "http://test",
-            &test_headers(),
-            MarketFeed::Trades,
-            "s1",
-            &["SYM"],
-        )
-        .await
-        .unwrap();
+        let req = test_request(mock);
+        subscribe_market(&req, MarketFeed::Trades, "s1", &["SYM"])
+            .await
+            .unwrap();
 
-        let reqs = mock.recorded_requests();
+        let reqs = req.http.recorded_requests();
         assert!(reqs[0].uri.to_string().contains("/market/trades/subscribe/s1"));
     }
 
@@ -237,28 +184,22 @@ mod tests {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"indicatorId":"IND1","valueNames":["date","open"],"valueTypes":["date","number"]}"#,
         )]);
+        let request = test_request(mock);
 
-        let req = SubscribeBarsRequest {
+        let bar_req = SubscribeBarsRequest {
             symbol: "XCME:ES.U25".into(),
             period: 1,
             bar_type: crate::types::BarType::Minute,
             load_size: 100,
         };
 
-        let resp = subscribe_indicator(
-            &mock,
-            "http://test",
-            &test_headers(),
-            BarKind::Trade,
-            "stream-789",
-            &req,
-        )
-        .await
-        .unwrap();
+        let resp = subscribe_indicator(&request, BarKind::Trade, "stream-789", &bar_req)
+            .await
+            .unwrap();
 
         assert_eq!(resp.indicator_id, "IND1");
 
-        let reqs = mock.recorded_requests();
+        let reqs = request.http.recorded_requests();
         assert_eq!(reqs[0].method, "POST");
         assert!(reqs[0]
             .uri
@@ -275,17 +216,12 @@ mod tests {
     #[tokio::test]
     async fn unsubscribe_indicator_sends_correct_request() {
         let mock = MockHttp::new(vec![MockResponse::ok(r#"{"status":"OK"}"#)]);
-        unsubscribe_indicator(
-            &mock,
-            "http://test",
-            &test_headers(),
-            "stream-1",
-            "IND-ABC",
-        )
-        .await
-        .unwrap();
+        let req = test_request(mock);
+        unsubscribe_indicator(&req, "stream-1", "IND-ABC")
+            .await
+            .unwrap();
 
-        let reqs = mock.recorded_requests();
+        let reqs = req.http.recorded_requests();
         assert_eq!(reqs[0].method, "DELETE");
         assert_eq!(
             reqs[0].uri.to_string(),
@@ -298,16 +234,9 @@ mod tests {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"status":"ERROR","message":"invalid stream"}"#,
         )]);
+        let req = test_request(mock);
 
-        let result = subscribe_market(
-            &mock,
-            "http://test",
-            &test_headers(),
-            MarketFeed::Quotes,
-            "s1",
-            &["SYM"],
-        )
-        .await;
+        let result = subscribe_market(&req, MarketFeed::Quotes, "s1", &["SYM"]).await;
 
         let err = result.unwrap_err();
         assert!(matches!(err, Error::Api { status: 200, ref message } if message == "invalid stream"));
@@ -318,16 +247,9 @@ mod tests {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"status":"ERROR","message":"not subscribed"}"#,
         )]);
+        let req = test_request(mock);
 
-        let result = unsubscribe_market(
-            &mock,
-            "http://test",
-            &test_headers(),
-            MarketFeed::Quotes,
-            "s1",
-            &["SYM"],
-        )
-        .await;
+        let result = unsubscribe_market(&req, MarketFeed::Quotes, "s1", &["SYM"]).await;
 
         let err = result.unwrap_err();
         assert!(matches!(err, Error::Api { status: 200, ref message } if message == "not subscribed"));
@@ -339,16 +261,9 @@ mod tests {
             hyper::StatusCode::UNAUTHORIZED,
             r#"{"error1":"Unauthorized"}"#,
         )]);
+        let req = test_request(mock);
 
-        let result = subscribe_market(
-            &mock,
-            "http://test",
-            &test_headers(),
-            MarketFeed::Quotes,
-            "s1",
-            &["SYM"],
-        )
-        .await;
+        let result = subscribe_market(&req, MarketFeed::Quotes, "s1", &["SYM"]).await;
 
         assert!(result.is_err());
         let err = result.unwrap_err();
