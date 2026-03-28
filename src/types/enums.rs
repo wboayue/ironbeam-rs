@@ -63,6 +63,13 @@ macro_rules! dual_format_enum {
             $( $(#[$vmeta])* #[serde(rename = $str)] $Variant ),+
         }
 
+        impl $Name {
+            /// Wire-format string for use in query parameters.
+            pub fn as_str(&self) -> &'static str {
+                match self { $( Self::$Variant => $str, )+ }
+            }
+        }
+
         impl<'de> Deserialize<'de> for $Name {
             fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
             where
@@ -102,16 +109,6 @@ dual_format_enum! {
     pub enum BalanceType {
         CurrentOpen = (0, "CURRENT_OPEN"),
         StartOfDay = (1, "START_OF_DAY"),
-    }
-}
-
-impl BalanceType {
-    /// Wire-format string for use in query parameters.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::CurrentOpen => "CURRENT_OPEN",
-            Self::StartOfDay => "START_OF_DAY",
-        }
     }
 }
 
