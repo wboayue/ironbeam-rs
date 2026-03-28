@@ -40,9 +40,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
             );
         }
 
-        let resp = client.positions(account_id).await?;
+        let positions = client.positions(account_id).await?;
         println!("\nPositions for {account_id}:");
-        for p in &resp.positions {
+        for p in &positions {
             println!("  {:?} {:?} {:?} @ {:?}", p.exch_sym, p.side, p.quantity, p.price);
         }
 

@@ -3,7 +3,7 @@ use crate::client::http::HttpTransport;
 use crate::error::Result;
 use crate::types::{
     AccountBalanceResponse, AccountFillsResponse, AccountPositions, AccountRiskResponse,
-    AccountsPositionsResponse, AllAccountsResponse, Balance, BalanceType, OrderFill,
+    AccountsPositionsResponse, AllAccountsResponse, Balance, BalanceType, OrderFill, Position,
     PositionsResponse, RiskInfo,
 };
 
@@ -70,16 +70,18 @@ impl<H: HttpTransport> Client<H> {
     /// # let client = Client::builder()
     /// #     .credentials(Credentials { username: "u".into(), password: "p".into(), api_key: "k".into() })
     /// #     .connect().await?;
-    /// let resp = client.positions("ACC001").await?;
-    /// for p in &resp.positions {
+    /// let positions = client.positions("ACC001").await?;
+    /// for p in &positions {
     ///     println!("{:?}: {:?} @ {:?}", p.exch_sym, p.quantity, p.price);
     /// }
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn positions(&self, account_id: &str) -> Result<PositionsResponse> {
+    pub async fn positions(&self, account_id: &str) -> Result<Vec<Position>> {
         let account_id = urlencoding::encode(account_id);
-        self.get(&format!("/account/{account_id}/positions")).await
+        let resp: PositionsResponse =
+            self.get(&format!("/account/{account_id}/positions")).await?;
+        Ok(resp.positions)
     }
 
     /// Get risk information for an account.
@@ -355,11 +357,10 @@ mod tests {
         )]);
         let client = test_client_with_auth(mock);
 
-        let resp = client.positions("ACC1").await.unwrap();
+        let positions = client.positions("ACC1").await.unwrap();
 
-        assert_eq!(resp.account_id.as_deref(), Some("ACC1"));
-        assert_eq!(resp.positions.len(), 1);
-        assert_eq!(resp.positions[0].exch_sym.as_deref(), Some("XCME:ES.U16"));
+        assert_eq!(positions.len(), 1);
+        assert_eq!(positions[0].exch_sym.as_deref(), Some("XCME:ES.U16"));
     }
 
     #[tokio::test]
