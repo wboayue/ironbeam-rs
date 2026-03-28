@@ -43,7 +43,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
             StreamEvent::Ping(_) => println!("keepalive"),
             StreamEvent::Notification(r) => println!("notification: {:?} {:?}", r.status, r.message),
-            _ => {}
+            event => {
+                println!("other event: {:?}", event);
+            }
         }
     }
 

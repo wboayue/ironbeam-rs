@@ -67,6 +67,9 @@ Pattern: `#[serde(rename = "s")] pub symbol: Symbol` — always use descriptive 
 **Separate types** (cannot unify):
 `Trade` (REST) vs `TradeOpt` (streaming) — different tick direction enum types + 5 extra streaming-only fields.
 
+**Dual-format enums** (REST sends strings, streaming sends integers):
+`RegCodeType`, `BalanceType` — custom `Deserialize` impls that accept both string (`"COMBINED"`) and integer (`1`) representations. Serialize always uses strings. Add the same pattern for any enum that appears in both REST and streaming responses with differing wire formats.
+
 **Time fields:**
 - API `Timestamp` (i64 ms epoch) → `time::OffsetDateTime` via `timestamp_ms` serde helper
 - API `DateString` ("YYYYMMDD") → `time::Date` via `date_yyyymmdd` serde helper
