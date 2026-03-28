@@ -1,22 +1,35 @@
 /// Parsed API error response body.
+///
+/// Some endpoints (e.g. 429 rate-limit) nest the error inside a `result` object.
 #[derive(Debug, serde::Deserialize)]
 struct ApiErrorBody {
     error1: Option<String>,
     message: Option<String>,
+    result: Option<Box<ApiErrorBody>>,
 }
 
 /// Extract a human-readable message from an API error JSON body.
-/// Prefers `error1` ("Unauthorized"), falls back to `message`, then raw body.
+/// Checks top-level `error1`/`message` first, then nested `result`, then raw body.
 pub(crate) fn parse_api_error(body: &[u8]) -> String {
     if let Ok(parsed) = serde_json::from_slice::<ApiErrorBody>(body) {
-        if let Some(e) = parsed.error1.filter(|s| !s.is_empty()) {
-            return e;
-        }
-        if let Some(m) = parsed.message.filter(|s| !s.is_empty()) {
-            return m;
+        if let Some(msg) = extract_message(&parsed) {
+            return msg;
         }
     }
     String::from_utf8_lossy(body).into_owned()
+}
+
+fn extract_message(body: &ApiErrorBody) -> Option<String> {
+    if let Some(e) = body.error1.as_ref().filter(|s| !s.is_empty()) {
+        return Some(e.clone());
+    }
+    if let Some(m) = body.message.as_ref().filter(|s| !s.is_empty()) {
+        return Some(m.clone());
+    }
+    if let Some(inner) = &body.result {
+        return extract_message(inner);
+    }
+    None
 }
 
 /// Crate-level error type.
@@ -82,5 +95,14 @@ mod tests {
     fn parse_api_error_raw_body_when_no_fields() {
         let body = br#"{"other":"field"}"#;
         assert_eq!(parse_api_error(body), r#"{"other":"field"}"#);
+    }
+
+    #[test]
+    fn parse_api_error_nested_result() {
+        let body = br#"{"result":{"additionalProperties":{},"error1":"Excessive calls in the last second - maximum allowed is 10","status":1,"message":"Error"},"statusCode":429,"headers":{}}"#;
+        assert_eq!(
+            parse_api_error(body),
+            "Excessive calls in the last second - maximum allowed is 10"
+        );
     }
 }

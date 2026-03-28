@@ -105,6 +105,16 @@ dual_format_enum! {
     }
 }
 
+impl BalanceType {
+    /// Wire-format string for use in query parameters.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::CurrentOpen => "CURRENT_OPEN",
+            Self::StartOfDay => "START_OF_DAY",
+        }
+    }
+}
+
 /// Order side.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
