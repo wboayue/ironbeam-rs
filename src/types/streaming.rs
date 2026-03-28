@@ -14,91 +14,92 @@ use super::{
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StreamResponse {
     /// Keepalive ping.
-    #[serde(default)]
-    pub p: Option<PingMessage>,
+    #[serde(rename = "p", default)]
+    pub ping: Option<PingMessage>,
 
     /// Quote updates.
-    #[serde(default)]
-    pub q: Option<Vec<QuoteFull>>,
+    #[serde(rename = "q", default)]
+    pub quotes: Option<Vec<QuoteFull>>,
 
     /// Depth updates.
-    #[serde(default)]
-    pub d: Option<Vec<Depth>>,
+    #[serde(rename = "d", default)]
+    pub depths: Option<Vec<Depth>>,
 
     /// Trade updates (streaming format).
-    #[serde(default)]
-    pub tr: Option<Vec<TradeOpt>>,
+    #[serde(rename = "tr", default)]
+    pub trades: Option<Vec<TradeOpt>>,
 
     /// Order updates.
-    #[serde(default)]
-    pub o: Option<Vec<Order>>,
+    #[serde(rename = "o", default)]
+    pub orders: Option<Vec<Order>>,
 
     /// Fill updates.
-    #[serde(default)]
-    pub f: Option<Vec<OrderFill>>,
+    #[serde(rename = "f", default)]
+    pub fills: Option<Vec<OrderFill>>,
 
     /// Position changes.
-    #[serde(default)]
-    pub ps: Option<Vec<Position>>,
+    #[serde(rename = "ps", default)]
+    pub positions: Option<Vec<Position>>,
 
     /// Initial position snapshot (all accounts).
-    #[serde(default)]
-    pub psa: Option<Vec<AccountPositions>>,
+    #[serde(rename = "psa", default)]
+    pub all_positions: Option<Vec<AccountPositions>>,
 
     /// Balance update.
-    #[serde(default)]
-    pub b: Option<Balance>,
+    #[serde(rename = "b", default)]
+    pub balance: Option<Balance>,
 
     /// Initial balance snapshot (all accounts).
-    #[serde(default)]
-    pub ba: Option<Vec<Balance>>,
+    #[serde(rename = "ba", default)]
+    pub all_balances: Option<Vec<Balance>>,
 
     /// Risk info change.
-    #[serde(default)]
-    pub ri: Option<RiskInfo>,
+    #[serde(rename = "ri", default)]
+    pub risk: Option<RiskInfo>,
 
     /// Initial risk snapshot (all accounts).
-    #[serde(default)]
-    pub ria: Option<Vec<RiskInfo>>,
+    #[serde(rename = "ria", default)]
+    pub all_risk: Option<Vec<RiskInfo>>,
 
     /// Trade bars.
-    #[serde(default)]
-    pub tb: Option<Vec<TradeBar>>,
+    #[serde(rename = "tb", default)]
+    pub trade_bars: Option<Vec<TradeBar>>,
 
     /// Tick bars.
-    #[serde(default)]
-    pub tc: Option<Vec<TickBar>>,
+    #[serde(rename = "tc", default)]
+    pub tick_bars: Option<Vec<TickBar>>,
 
     /// Time bars.
-    #[serde(default)]
-    pub ti: Option<Vec<TimeBar>>,
+    #[serde(rename = "ti", default)]
+    pub time_bars: Option<Vec<TimeBar>>,
 
     /// Volume bars.
-    #[serde(default)]
-    pub vb: Option<Vec<VolumeBar>>,
+    #[serde(rename = "vb", default)]
+    pub volume_bars: Option<Vec<VolumeBar>>,
 
     /// Indicator values.
-    #[serde(default)]
-    pub i: Option<Vec<IndicatorValues>>,
+    #[serde(rename = "i", default)]
+    pub indicators: Option<Vec<IndicatorValues>>,
 
     /// Account/session change notification.
-    #[serde(default)]
-    pub r: Option<Response>,
+    #[serde(rename = "r", default)]
+    pub notification: Option<Response>,
 }
 
 /// Indicator values from streaming.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct IndicatorValues {
     /// Unique indicator value name.
-    pub n: String,
+    #[serde(rename = "n")]
+    pub name: String,
 
     /// From index.
-    #[serde(default)]
-    pub fi: Option<i64>,
+    #[serde(rename = "fi", default)]
+    pub from_index: Option<i64>,
 
     /// 2D array of values.
-    #[serde(default)]
-    pub v: Vec<Vec<String>>,
+    #[serde(rename = "v", default)]
+    pub values: Vec<Vec<String>>,
 }
 
 /// Response when subscribing to an indicator.
@@ -151,16 +152,16 @@ mod tests {
     fn stream_response_ping() {
         let json = r#"{"p":{"ping":"keepalive"}}"#;
         let sr: StreamResponse = serde_json::from_str(json).unwrap();
-        assert!(sr.p.is_some());
-        assert!(sr.q.is_none());
+        assert!(sr.ping.is_some());
+        assert!(sr.quotes.is_none());
     }
 
     #[test]
     fn stream_response_quotes() {
         let json = r#"{"q":[{"s":"XCME:ES.U16","l":4500.0}]}"#;
         let sr: StreamResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(sr.q.as_ref().unwrap().len(), 1);
-        assert_eq!(sr.q.as_ref().unwrap()[0].s, "XCME:ES.U16");
+        assert_eq!(sr.quotes.as_ref().unwrap().len(), 1);
+        assert_eq!(sr.quotes.as_ref().unwrap()[0].symbol, "XCME:ES.U16");
     }
 
     #[test]
@@ -176,7 +177,7 @@ mod tests {
             "dr":"0"
         }]}"#;
         let sr: StreamResponse = serde_json::from_str(json).unwrap();
-        let orders = sr.o.unwrap();
+        let orders = sr.orders.unwrap();
         assert_eq!(orders[0].order_id, "ORD001");
     }
 

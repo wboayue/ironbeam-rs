@@ -1,24 +1,103 @@
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
-/// API response status.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum ResponseStatus {
-    Ok,
-    Error,
-    Warning,
-    Info,
-    Fatal,
-    Unknown,
+/// Serde visitor that accepts both integer and string representations.
+///
+/// Used by [`dual_format_enum!`] to keep the per-enum macro expansion small.
+struct DualFormatVisitor<T: Copy + 'static> {
+    type_name: &'static str,
+    int_map: &'static [(u64, T)],
+    str_map: &'static [(&'static str, T)],
 }
 
-/// Account balance type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum BalanceType {
-    CurrentOpen,
-    StartOfDay,
+impl<'de, T: Copy> serde::de::Visitor<'de> for DualFormatVisitor<T> {
+    type Value = T;
+
+    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "a string or integer {}", self.type_name)
+    }
+
+    fn visit_u64<E: serde::de::Error>(self, v: u64) -> std::result::Result<T, E> {
+        for &(k, val) in self.int_map {
+            if k == v {
+                return Ok(val);
+            }
+        }
+        Err(E::custom(format!("unknown {} integer: {}", self.type_name, v)))
+    }
+
+    fn visit_i64<E: serde::de::Error>(self, v: i64) -> std::result::Result<T, E> {
+        let v = u64::try_from(v).map_err(|_| {
+            E::custom(format!("negative {}: {}", self.type_name, v))
+        })?;
+        self.visit_u64(v)
+    }
+
+    fn visit_str<E: serde::de::Error>(self, v: &str) -> std::result::Result<T, E> {
+        for &(k, val) in self.str_map {
+            if k == v {
+                return Ok(val);
+            }
+        }
+        Err(E::custom(format!("unknown {} string: {}", self.type_name, v)))
+    }
+}
+
+/// Generate a dual-format enum that deserializes from both strings (REST) and
+/// integers (streaming). Serialization always uses the string form.
+macro_rules! dual_format_enum {
+    (
+        $(#[$meta:meta])*
+        $vis:vis enum $Name:ident {
+            $( $(#[$vmeta:meta])* $Variant:ident = ($int:expr, $str:expr) ),+ $(,)?
+        }
+    ) => {
+        $(#[$meta])*
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+        $vis enum $Name {
+            $( $(#[$vmeta])* #[serde(rename = $str)] $Variant ),+
+        }
+
+        impl<'de> Deserialize<'de> for $Name {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                static INT_MAP: &[(u64, $Name)] = &[$( ($int, $Name::$Variant), )+];
+                static STR_MAP: &[(&str, $Name)] = &[$( ($str, $Name::$Variant), )+];
+
+                deserializer.deserialize_any(DualFormatVisitor {
+                    type_name: stringify!($Name),
+                    int_map: INT_MAP,
+                    str_map: STR_MAP,
+                })
+            }
+        }
+    };
+}
+
+dual_format_enum! {
+    /// API response status.
+    ///
+    /// REST sends string values (`"OK"`), streaming sends integers (`0`).
+    pub enum ResponseStatus {
+        Ok = (0, "OK"),
+        Error = (1, "ERROR"),
+        Warning = (2, "WARNING"),
+        Info = (3, "INFO"),
+        Fatal = (4, "FATAL"),
+        Unknown = (5, "UNKNOWN"),
+    }
+}
+
+dual_format_enum! {
+    /// Account balance type.
+    ///
+    /// REST sends string values (`"CURRENT_OPEN"`), streaming sends integers (`0`).
+    pub enum BalanceType {
+        CurrentOpen = (0, "CURRENT_OPEN"),
+        StartOfDay = (1, "START_OF_DAY"),
+    }
 }
 
 /// Order side.
@@ -137,22 +216,27 @@ pub enum Side {
     Ask,
 }
 
-/// Market side (short form).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum SideShort {
-    B,
-    A,
+dual_format_enum! {
+    /// Depth side.
+    ///
+    /// REST/strings use `"B"` (bid) / `"A"` (ask), streaming sends integers (`0` / `1`).
+    pub enum DepthSide {
+        Bid = (0, "B"),
+        Ask = (1, "A"),
+    }
 }
 
-/// Regulatory code type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum RegCodeType {
-    Invalid,
-    Combined,
-    Regulated,
-    NonSecured,
-    Secured,
+dual_format_enum! {
+    /// Regulatory code type.
+    ///
+    /// REST sends string values (`"COMBINED"`), streaming sends integers (`1`).
+    pub enum RegCodeType {
+        Invalid = (0, "INVALID"),
+        Combined = (1, "COMBINED"),
+        Regulated = (2, "REGULATED"),
+        NonSecured = (3, "NON_SECURED"),
+        Secured = (4, "SECURED"),
+    }
 }
 
 /// Tick direction (string enum).
@@ -446,6 +530,18 @@ mod tests {
     }
 
     #[test]
+    fn response_status_from_integer() {
+        assert_eq!(
+            serde_json::from_str::<ResponseStatus>("0").unwrap(),
+            ResponseStatus::Ok
+        );
+        assert_eq!(
+            serde_json::from_str::<ResponseStatus>("1").unwrap(),
+            ResponseStatus::Error
+        );
+    }
+
+    #[test]
     fn balance_type_round_trip() {
         assert_eq!(
             serde_json::to_string(&BalanceType::CurrentOpen).unwrap(),
@@ -455,5 +551,90 @@ mod tests {
             serde_json::from_str::<BalanceType>("\"START_OF_DAY\"").unwrap(),
             BalanceType::StartOfDay
         );
+    }
+
+    #[test]
+    fn balance_type_from_integer() {
+        assert_eq!(
+            serde_json::from_str::<BalanceType>("0").unwrap(),
+            BalanceType::CurrentOpen
+        );
+        assert_eq!(
+            serde_json::from_str::<BalanceType>("1").unwrap(),
+            BalanceType::StartOfDay
+        );
+    }
+
+    #[test]
+    fn balance_type_negative_integer_rejected() {
+        assert!(serde_json::from_str::<BalanceType>("-1").is_err());
+    }
+
+    #[test]
+    fn balance_type_unknown_integer_rejected() {
+        assert!(serde_json::from_str::<BalanceType>("99").is_err());
+    }
+
+    #[test]
+    fn reg_code_type_round_trip() {
+        assert_eq!(
+            serde_json::to_string(&RegCodeType::Combined).unwrap(),
+            "\"COMBINED\""
+        );
+        assert_eq!(
+            serde_json::from_str::<RegCodeType>("\"NON_SECURED\"").unwrap(),
+            RegCodeType::NonSecured
+        );
+    }
+
+    #[test]
+    fn reg_code_type_from_integer() {
+        assert_eq!(
+            serde_json::from_str::<RegCodeType>("0").unwrap(),
+            RegCodeType::Invalid
+        );
+        assert_eq!(
+            serde_json::from_str::<RegCodeType>("1").unwrap(),
+            RegCodeType::Combined
+        );
+        assert_eq!(
+            serde_json::from_str::<RegCodeType>("4").unwrap(),
+            RegCodeType::Secured
+        );
+    }
+
+    #[test]
+    fn reg_code_type_negative_integer_rejected() {
+        assert!(serde_json::from_str::<RegCodeType>("-1").is_err());
+    }
+
+    #[test]
+    fn reg_code_type_unknown_integer_rejected() {
+        assert!(serde_json::from_str::<RegCodeType>("99").is_err());
+    }
+
+    #[test]
+    fn depth_side_round_trip() {
+        assert_eq!(serde_json::to_string(&DepthSide::Bid).unwrap(), "\"B\"");
+        assert_eq!(
+            serde_json::from_str::<DepthSide>("\"A\"").unwrap(),
+            DepthSide::Ask
+        );
+    }
+
+    #[test]
+    fn depth_side_from_integer() {
+        assert_eq!(serde_json::from_str::<DepthSide>("0").unwrap(), DepthSide::Bid);
+        assert_eq!(serde_json::from_str::<DepthSide>("1").unwrap(), DepthSide::Ask);
+    }
+
+    #[test]
+    fn depth_side_negative_integer_rejected() {
+        assert!(serde_json::from_str::<DepthSide>("-1").is_err());
+    }
+
+    #[test]
+    fn depth_side_unknown_integer_rejected() {
+        assert!(serde_json::from_str::<DepthSide>("99").is_err());
     }
 }

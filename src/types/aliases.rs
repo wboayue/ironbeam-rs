@@ -131,6 +131,31 @@ pub mod option_date_yyyymmdd {
     }
 }
 
+/// Serde helper: deserialize optional RFC 3339 / ISO 8601 string as `Option<OffsetDateTime>`.
+pub mod option_datetime_rfc3339 {
+    use super::*;
+    use time::format_description::well_known::Rfc3339;
+
+    pub fn serialize<S: Serializer>(dt: &Option<OffsetDateTime>, s: S) -> Result<S::Ok, S::Error> {
+        match dt {
+            Some(dt) => s.serialize_str(&dt.format(&Rfc3339).map_err(serde::ser::Error::custom)?),
+            None => s.serialize_none(),
+        }
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        d: D,
+    ) -> Result<Option<OffsetDateTime>, D::Error> {
+        let s = Option::<String>::deserialize(d)?;
+        match s {
+            Some(s) if !s.is_empty() => OffsetDateTime::parse(&s, &Rfc3339)
+                .map(Some)
+                .map_err(serde::de::Error::custom),
+            _ => Ok(None),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -209,5 +234,35 @@ mod tests {
     fn option_date_present() {
         let parsed: OptDateTest = serde_json::from_str(r#"{"d":"20240115"}"#).unwrap();
         assert_eq!(parsed.d, Some(date!(2024 - 01 - 15)));
+    }
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct OptRfc3339Test {
+        #[serde(default, with = "option_datetime_rfc3339")]
+        dt: Option<OffsetDateTime>,
+    }
+
+    #[test]
+    fn option_datetime_rfc3339_present() {
+        let parsed: OptRfc3339Test =
+            serde_json::from_str(r#"{"dt":"2016-08-01T00:00:00Z"}"#).unwrap();
+        assert_eq!(parsed.dt, Some(datetime!(2016-08-01 00:00:00 UTC)));
+    }
+
+    #[test]
+    fn option_datetime_rfc3339_absent() {
+        let parsed: OptRfc3339Test = serde_json::from_str(r#"{}"#).unwrap();
+        assert_eq!(parsed.dt, None);
+    }
+
+    #[test]
+    fn option_datetime_rfc3339_round_trip() {
+        let t = OptRfc3339Test {
+            dt: Some(datetime!(2024-01-15 12:30:00 UTC)),
+        };
+        let json = serde_json::to_string(&t).unwrap();
+        assert!(json.contains("2024-01-15T12:30:00Z"));
+        let parsed: OptRfc3339Test = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, t);
     }
 }

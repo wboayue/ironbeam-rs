@@ -5,7 +5,7 @@ use hyper::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 use crate::error::{Error, Result};
 
 use super::rest::auth;
-use super::{Client, http::HttpClient};
+use super::{Client, RequestHelper, http::HttpClient};
 
 const DEMO_BASE_URL: &str = "https://demo.ironbeamapi.com/v2";
 const LIVE_BASE_URL: &str = "https://live.ironbeamapi.com/v2";
@@ -91,9 +91,11 @@ impl ClientBuilder {
         auth_headers.insert(AUTHORIZATION, value);
 
         Ok(Client {
-            base_url: self.base_url,
-            auth_headers,
-            http,
+            request: RequestHelper {
+                http,
+                base_url: self.base_url,
+                auth_headers,
+            },
             is_logged_out: AtomicBool::new(false),
         })
     }

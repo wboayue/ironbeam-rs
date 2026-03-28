@@ -59,11 +59,16 @@ Balance, MarginInfo, MarginDetail, Position, RiskInfo, Order, OrderFill
 Pattern: `#[serde(rename = "accountId", alias = "a")]`
 `rename` sets the canonical (REST) wire name; `alias` accepts the streaming abbreviation. Serialization always uses `rename`.
 
-**Shared types** (identical across REST and streaming):
-QuoteFull, Depth/DepthLevel, TradeBar, TickBar, TimeBar, VolumeBar
+**Shared types** (streaming-only short wire names):
+QuoteFull, Depth/DepthLevel, TradeBar, TickBar, TimeBar, VolumeBar, TradeOpt, IndicatorValues
+
+Pattern: `#[serde(rename = "s")] pub symbol: Symbol` — always use descriptive Rust field names, never expose short wire names as field identifiers. Map via `#[serde(rename = "wire_name")]`.
 
 **Separate types** (cannot unify):
 `Trade` (REST) vs `TradeOpt` (streaming) — different tick direction enum types + 5 extra streaming-only fields.
+
+**Dual-format enums** (REST sends strings, streaming sends integers):
+`RegCodeType`, `BalanceType`, `ResponseStatus`, `DepthSide` — custom `Deserialize` impls that accept both string (`"COMBINED"`) and integer (`1`) representations. Serialize always uses strings. Add the same pattern for any enum that appears in both REST and streaming responses with differing wire formats.
 
 **Time fields:**
 - API `Timestamp` (i64 ms epoch) → `time::OffsetDateTime` via `timestamp_ms` serde helper
@@ -92,6 +97,7 @@ QuoteFull, Depth/DepthLevel, TradeBar, TickBar, TimeBar, VolumeBar
 - Avoid `unwrap()`/`expect()` in library code. Reserve for tests only.
 - Use `#[must_use]` on functions returning values that shouldn't be silently dropped.
 - Never derive `Debug` on types holding secrets (credentials, tokens). Use manual impls that redact sensitive fields.
+- **Field naming**: always use descriptive Rust names for struct fields, never short wire names. Map to wire format via `#[serde(rename = "wire_name")]` or `#[serde(rename = "camelCase", alias = "short")]`.
 
 ### Performance
 - Minimize allocations on the hot path (streaming message deserialization).
@@ -106,6 +112,18 @@ QuoteFull, Depth/DepthLevel, TradeBar, TickBar, TimeBar, VolumeBar
 - Map API error responses (400, 401, 403, 429, 500) to typed variants with status code and body.
 - Never panic. Never `unwrap()` outside tests.
 - Library `Error` must not include application-only concerns (e.g., `env::VarError`). Examples use `Box<dyn Error>`.
+
+### Logging
+- Use `tracing` with structured fields, not string interpolation. Prefer `tracing::info!(stream_id = %id, "msg")` over `tracing::info!("msg for {id}")`.
+- **Level guide:**
+  - `error!` — transport/infrastructure failures that terminate an operation (WebSocket read error, TLS failure). Something is broken.
+  - `warn!` — recoverable issues that may need investigation (parse failures, server-initiated disconnects, failed background cleanup).
+  - `info!` — lifecycle events and state changes (authenticated, stream connected/closed, subscribe/unsubscribe). One line per operation, not per message.
+  - `debug!` — internal details useful during development (raw payloads, shutdown signals, unexpected but harmless opcodes, config fallbacks).
+- **Never log at `info!` or above on the hot path** (per-message processing). Parse/dispatch in the message loop should only log on errors.
+- **Always include correlation fields** (`stream_id`, `indicator_id`) on stream-related logs so messages from concurrent streams can be distinguished.
+- **Never log secrets** (tokens, passwords, API keys). Auth headers are redacted in `Debug` impls; keep it that way.
+- No logging in type/serde code. Logging belongs in client/transport layers only.
 
 ### Testing
 - Aim for 80%+ coverage.
@@ -140,6 +158,9 @@ QuoteFull, Depth/DepthLevel, TradeBar, TickBar, TimeBar, VolumeBar
 - `examples/` folder has runnable examples for each API domain, suitable for copy-paste.
 - Examples use `#[tokio::main]` and show error handling.
 - Keep doc examples in sync with actual API types. Run `cargo test --doc` to verify.
+
+### Maintenance
+- When fixing a review issue that reflects a missing or unclear convention, update this file so the same issue isn't repeated. CLAUDE.md is the source of truth for project standards.
 
 ### API Notes
 - Auth requires all three fields: username, password, and apiKey (spec says optional, but API rejects without all three).
