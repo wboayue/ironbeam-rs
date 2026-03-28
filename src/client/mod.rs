@@ -1,6 +1,7 @@
 mod config;
 mod http;
 pub(crate) mod rest;
+pub mod stream;
 
 pub use config::{ClientBuilder, Credentials};
 pub use http::HttpTransport;
@@ -68,6 +69,22 @@ impl<H: HttpTransport> Client<H> {
     pub(crate) async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
         let uri = format!("{}{path}", self.base_url).parse()?;
         let (status, body) = self.http.get(uri, &self.auth_headers).await?;
+
+        if !status.is_success() {
+            return Err(Error::Api {
+                status: status.as_u16(),
+                message: parse_api_error(&body),
+            });
+        }
+
+        Ok(serde_json::from_slice(&body)?)
+    }
+
+    /// Send an authenticated DELETE request and deserialize the JSON response.
+    #[allow(dead_code)]
+    pub(crate) async fn delete<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
+        let uri = format!("{}{path}", self.base_url).parse()?;
+        let (status, body) = self.http.delete(uri, &self.auth_headers).await?;
 
         if !status.is_success() {
             return Err(Error::Api {

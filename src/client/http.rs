@@ -27,6 +27,12 @@ pub trait HttpTransport: Clone + Send + Sync + 'static {
         body: Bytes,
         headers: &HeaderMap,
     ) -> impl Future<Output = Result<(StatusCode, Bytes)>> + Send;
+
+    fn delete(
+        &self,
+        uri: Uri,
+        headers: &HeaderMap,
+    ) -> impl Future<Output = Result<(StatusCode, Bytes)>> + Send;
 }
 
 type Connector = hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>;
@@ -91,6 +97,24 @@ impl HttpTransport for HttpClient {
 
         let req = builder
             .body(Full::new(body))
+            .map_err(|e: hyper::http::Error| Error::Other(e.to_string()))?;
+
+        let resp: Response<Incoming> = self.inner.request(req).await?;
+        let status = resp.status();
+        let body = resp.into_body().collect().await?.to_bytes();
+
+        Ok((status, body))
+    }
+
+    async fn delete(&self, uri: Uri, headers: &HeaderMap) -> Result<(StatusCode, Bytes)> {
+        let mut builder = hyper::Request::builder().method("DELETE").uri(uri);
+
+        for (key, value) in headers {
+            builder = builder.header(key, value);
+        }
+
+        let req = builder
+            .body(Full::new(Bytes::new()))
             .map_err(|e: hyper::http::Error| Error::Other(e.to_string()))?;
 
         let resp: Response<Incoming> = self.inner.request(req).await?;
@@ -196,6 +220,17 @@ pub(crate) mod mock {
                 uri,
                 headers: headers.clone(),
                 body,
+            });
+            let r = self.next_response();
+            Ok((r.status, r.body))
+        }
+
+        async fn delete(&self, uri: Uri, headers: &HeaderMap) -> Result<(StatusCode, Bytes)> {
+            self.requests.lock().unwrap().push(RecordedRequest {
+                method: "DELETE",
+                uri,
+                headers: headers.clone(),
+                body: Bytes::new(),
             });
             let r = self.next_response();
             Ok((r.status, r.body))

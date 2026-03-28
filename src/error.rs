@@ -40,6 +40,9 @@ pub enum Error {
     #[error("invalid uri: {0}")]
     InvalidUri(#[from] hyper::http::uri::InvalidUri),
 
+    #[error("websocket: {0}")]
+    WebSocket(String),
+
     #[error("{0}")]
     Other(String),
 }
