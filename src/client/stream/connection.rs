@@ -92,11 +92,14 @@ pub(crate) async fn connect(base_url: &str, stream_id: &str, token: &str) -> Res
     let uri: Uri = ws_url.parse()?;
 
     let host = uri.host().ok_or_else(|| Error::WebSocket("missing host".into()))?;
-    let port = uri.port_u16().unwrap_or(443);
+    let default_port = if uri.scheme_str() == Some("ws") { 80 } else { 443 };
+    let port = uri.port_u16().unwrap_or(default_port);
     let addr = format!("{host}:{port}");
 
     let tcp = tokio::net::TcpStream::connect(&addr)
         .await
+        .map_err(|e| Error::WebSocket(e.to_string()))?;
+    tcp.set_nodelay(true)
         .map_err(|e| Error::WebSocket(e.to_string()))?;
 
     let tls = connect_tls(host, tcp).await?;

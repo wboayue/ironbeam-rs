@@ -46,6 +46,9 @@ pub struct StreamBuilder<'a, H: HttpTransport> {
 
 impl<'a, H: HttpTransport> StreamBuilder<'a, H> {
     /// Set the event channel capacity (default: 256).
+    ///
+    /// Too small and the message loop blocks on send (backpressure);
+    /// too large and stale quotes may buffer before consumption.
     #[must_use]
     pub fn channel_capacity(mut self, capacity: usize) -> Self {
         self.channel_capacity = capacity;
@@ -77,7 +80,7 @@ impl<'a, H: HttpTransport> StreamBuilder<'a, H> {
             auth_headers: self.client.auth_headers.clone(),
             rx,
             shutdown_tx,
-            task,
+            task: Some(task),
         })
     }
 }
@@ -143,7 +146,7 @@ pub struct StreamHandle<H: HttpTransport> {
     auth_headers: HeaderMap,
     rx: mpsc::Receiver<Result<StreamEvent>>,
     shutdown_tx: watch::Sender<bool>,
-    task: JoinHandle<()>,
+    task: Option<JoinHandle<()>>,
 }
 
 impl<H: HttpTransport> StreamHandle<H> {
@@ -154,12 +157,13 @@ impl<H: HttpTransport> StreamHandle<H> {
         self.rx.recv().await
     }
 
-    /// Gracefully close the stream.
-    pub async fn close(self) -> Result<()> {
+    /// Gracefully close the stream and await the message loop.
+    pub async fn close(mut self) -> Result<()> {
         let _ = self.shutdown_tx.send(true);
-        self.task
-            .await
-            .map_err(|e| Error::WebSocket(e.to_string()))
+        if let Some(task) = self.task.take() {
+            task.await.map_err(|e| Error::WebSocket(e.to_string()))?;
+        }
+        Ok(())
     }
 
     /// The stream session identifier.
@@ -337,6 +341,14 @@ impl<H: HttpTransport> StreamHandle<H> {
             indicator_id,
         )
         .await
+    }
+}
+
+/// Best-effort shutdown on drop. Signals the message loop to close but
+/// cannot await completion. Prefer [`StreamHandle::close()`] for guaranteed cleanup.
+impl<H: HttpTransport> Drop for StreamHandle<H> {
+    fn drop(&mut self) {
+        let _ = self.shutdown_tx.send(true);
     }
 }
 

@@ -1,115 +1,88 @@
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
-/// API response status.
-///
-/// REST sends string values (`"OK"`), streaming sends integers (`0`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum ResponseStatus {
-    Ok,
-    Error,
-    Warning,
-    Info,
-    Fatal,
-    Unknown,
-}
-
-impl<'de> Deserialize<'de> for ResponseStatus {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct ResponseStatusVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for ResponseStatusVisitor {
-            type Value = ResponseStatus;
-
-            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                f.write_str("a string or integer response status")
-            }
-
-            fn visit_u64<E: serde::de::Error>(self, v: u64) -> std::result::Result<ResponseStatus, E> {
-                match v {
-                    0 => Ok(ResponseStatus::Ok),
-                    1 => Ok(ResponseStatus::Error),
-                    2 => Ok(ResponseStatus::Warning),
-                    3 => Ok(ResponseStatus::Info),
-                    4 => Ok(ResponseStatus::Fatal),
-                    5 => Ok(ResponseStatus::Unknown),
-                    _ => Err(E::custom(format!("unknown response status integer: {v}"))),
-                }
-            }
-
-            fn visit_i64<E: serde::de::Error>(self, v: i64) -> std::result::Result<ResponseStatus, E> {
-                let v = u64::try_from(v).map_err(|_| E::custom(format!("negative response status: {v}")))?;
-                self.visit_u64(v)
-            }
-
-            fn visit_str<E: serde::de::Error>(self, v: &str) -> std::result::Result<ResponseStatus, E> {
-                match v {
-                    "OK" => Ok(ResponseStatus::Ok),
-                    "ERROR" => Ok(ResponseStatus::Error),
-                    "WARNING" => Ok(ResponseStatus::Warning),
-                    "INFO" => Ok(ResponseStatus::Info),
-                    "FATAL" => Ok(ResponseStatus::Fatal),
-                    "UNKNOWN" => Ok(ResponseStatus::Unknown),
-                    _ => Err(E::custom(format!("unknown response status string: {v}"))),
-                }
-            }
+/// Generate a dual-format enum that deserializes from both strings (REST) and
+/// integers (streaming). Serialization always uses the string form.
+macro_rules! dual_format_enum {
+    (
+        $(#[$meta:meta])*
+        $vis:vis enum $Name:ident {
+            $( $(#[$vmeta:meta])* $Variant:ident = ($int:expr, $str:expr) ),+ $(,)?
+        }
+    ) => {
+        $(#[$meta])*
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+        $vis enum $Name {
+            $( $(#[$vmeta])* #[serde(rename = $str)] $Variant ),+
         }
 
-        deserializer.deserialize_any(ResponseStatusVisitor)
+        impl<'de> Deserialize<'de> for $Name {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct Visitor;
+
+                impl<'de> serde::de::Visitor<'de> for Visitor {
+                    type Value = $Name;
+
+                    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        f.write_str(concat!("a string or integer ", stringify!($Name)))
+                    }
+
+                    fn visit_u64<E: serde::de::Error>(self, v: u64) -> std::result::Result<$Name, E> {
+                        match v {
+                            $( $int => Ok($Name::$Variant), )+
+                            _ => Err(E::custom(format!(
+                                concat!("unknown ", stringify!($Name), " integer: {}"), v
+                            ))),
+                        }
+                    }
+
+                    fn visit_i64<E: serde::de::Error>(self, v: i64) -> std::result::Result<$Name, E> {
+                        let v = u64::try_from(v).map_err(|_| E::custom(format!(
+                            concat!("negative ", stringify!($Name), ": {}"), v
+                        )))?;
+                        self.visit_u64(v)
+                    }
+
+                    fn visit_str<E: serde::de::Error>(self, v: &str) -> std::result::Result<$Name, E> {
+                        match v {
+                            $( $str => Ok($Name::$Variant), )+
+                            _ => Err(E::custom(format!(
+                                concat!("unknown ", stringify!($Name), " string: {}"), v
+                            ))),
+                        }
+                    }
+                }
+
+                deserializer.deserialize_any(Visitor)
+            }
+        }
+    };
+}
+
+dual_format_enum! {
+    /// API response status.
+    ///
+    /// REST sends string values (`"OK"`), streaming sends integers (`0`).
+    pub enum ResponseStatus {
+        Ok = (0, "OK"),
+        Error = (1, "ERROR"),
+        Warning = (2, "WARNING"),
+        Info = (3, "INFO"),
+        Fatal = (4, "FATAL"),
+        Unknown = (5, "UNKNOWN"),
     }
 }
 
-/// Account balance type.
-///
-/// REST sends string values (`"CURRENT_OPEN"`), streaming sends integers (`0`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum BalanceType {
-    CurrentOpen,
-    StartOfDay,
-}
-
-impl<'de> Deserialize<'de> for BalanceType {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct BalanceTypeVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for BalanceTypeVisitor {
-            type Value = BalanceType;
-
-            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                f.write_str("a string or integer balance type")
-            }
-
-            fn visit_u64<E: serde::de::Error>(self, v: u64) -> std::result::Result<BalanceType, E> {
-                match v {
-                    0 => Ok(BalanceType::CurrentOpen),
-                    1 => Ok(BalanceType::StartOfDay),
-                    _ => Err(E::custom(format!("unknown balance type integer: {v}"))),
-                }
-            }
-
-            fn visit_i64<E: serde::de::Error>(self, v: i64) -> std::result::Result<BalanceType, E> {
-                let v = u64::try_from(v).map_err(|_| E::custom(format!("negative balance type: {v}")))?;
-                self.visit_u64(v)
-            }
-
-            fn visit_str<E: serde::de::Error>(self, v: &str) -> std::result::Result<BalanceType, E> {
-                match v {
-                    "CURRENT_OPEN" => Ok(BalanceType::CurrentOpen),
-                    "START_OF_DAY" => Ok(BalanceType::StartOfDay),
-                    _ => Err(E::custom(format!("unknown balance type string: {v}"))),
-                }
-            }
-        }
-
-        deserializer.deserialize_any(BalanceTypeVisitor)
+dual_format_enum! {
+    /// Account balance type.
+    ///
+    /// REST sends string values (`"CURRENT_OPEN"`), streaming sends integers (`0`).
+    pub enum BalanceType {
+        CurrentOpen = (0, "CURRENT_OPEN"),
+        StartOfDay = (1, "START_OF_DAY"),
     }
 }
 
@@ -229,113 +202,26 @@ pub enum Side {
     Ask,
 }
 
-/// Depth side.
-///
-/// REST/strings use `"B"` (bid) / `"A"` (ask), streaming sends integers (`0` / `1`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
-pub enum DepthSide {
-    #[serde(rename = "B")]
-    Bid,
-    #[serde(rename = "A")]
-    Ask,
-}
-
-impl<'de> Deserialize<'de> for DepthSide {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct DepthSideVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for DepthSideVisitor {
-            type Value = DepthSide;
-
-            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                f.write_str("a string (\"B\"/\"A\") or integer (0/1) depth side")
-            }
-
-            fn visit_u64<E: serde::de::Error>(self, v: u64) -> std::result::Result<DepthSide, E> {
-                match v {
-                    0 => Ok(DepthSide::Bid),
-                    1 => Ok(DepthSide::Ask),
-                    _ => Err(E::custom(format!("unknown depth side integer: {v}"))),
-                }
-            }
-
-            fn visit_i64<E: serde::de::Error>(self, v: i64) -> std::result::Result<DepthSide, E> {
-                let v = u64::try_from(v).map_err(|_| E::custom(format!("negative depth side: {v}")))?;
-                self.visit_u64(v)
-            }
-
-            fn visit_str<E: serde::de::Error>(self, v: &str) -> std::result::Result<DepthSide, E> {
-                match v {
-                    "B" => Ok(DepthSide::Bid),
-                    "A" => Ok(DepthSide::Ask),
-                    _ => Err(E::custom(format!("unknown depth side string: {v}"))),
-                }
-            }
-        }
-
-        deserializer.deserialize_any(DepthSideVisitor)
+dual_format_enum! {
+    /// Depth side.
+    ///
+    /// REST/strings use `"B"` (bid) / `"A"` (ask), streaming sends integers (`0` / `1`).
+    pub enum DepthSide {
+        Bid = (0, "B"),
+        Ask = (1, "A"),
     }
 }
 
-/// Regulatory code type.
-///
-/// REST sends string values (`"COMBINED"`), streaming sends integers (`1`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum RegCodeType {
-    Invalid,
-    Combined,
-    Regulated,
-    NonSecured,
-    Secured,
-}
-
-impl<'de> Deserialize<'de> for RegCodeType {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct RegCodeVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for RegCodeVisitor {
-            type Value = RegCodeType;
-
-            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                f.write_str("a string or integer regulatory code")
-            }
-
-            fn visit_u64<E: serde::de::Error>(self, v: u64) -> std::result::Result<RegCodeType, E> {
-                match v {
-                    0 => Ok(RegCodeType::Invalid),
-                    1 => Ok(RegCodeType::Combined),
-                    2 => Ok(RegCodeType::Regulated),
-                    3 => Ok(RegCodeType::NonSecured),
-                    4 => Ok(RegCodeType::Secured),
-                    _ => Err(E::custom(format!("unknown reg code integer: {v}"))),
-                }
-            }
-
-            fn visit_i64<E: serde::de::Error>(self, v: i64) -> std::result::Result<RegCodeType, E> {
-                let v = u64::try_from(v).map_err(|_| E::custom(format!("negative reg code: {v}")))?;
-                self.visit_u64(v)
-            }
-
-            fn visit_str<E: serde::de::Error>(self, v: &str) -> std::result::Result<RegCodeType, E> {
-                match v {
-                    "INVALID" => Ok(RegCodeType::Invalid),
-                    "COMBINED" => Ok(RegCodeType::Combined),
-                    "REGULATED" => Ok(RegCodeType::Regulated),
-                    "NON_SECURED" => Ok(RegCodeType::NonSecured),
-                    "SECURED" => Ok(RegCodeType::Secured),
-                    _ => Err(E::custom(format!("unknown reg code string: {v}"))),
-                }
-            }
-        }
-
-        deserializer.deserialize_any(RegCodeVisitor)
+dual_format_enum! {
+    /// Regulatory code type.
+    ///
+    /// REST sends string values (`"COMBINED"`), streaming sends integers (`1`).
+    pub enum RegCodeType {
+        Invalid = (0, "INVALID"),
+        Combined = (1, "COMBINED"),
+        Regulated = (2, "REGULATED"),
+        NonSecured = (3, "NON_SECURED"),
+        Secured = (4, "SECURED"),
     }
 }
 
@@ -711,5 +597,30 @@ mod tests {
     #[test]
     fn reg_code_type_unknown_integer_rejected() {
         assert!(serde_json::from_str::<RegCodeType>("99").is_err());
+    }
+
+    #[test]
+    fn depth_side_round_trip() {
+        assert_eq!(serde_json::to_string(&DepthSide::Bid).unwrap(), "\"B\"");
+        assert_eq!(
+            serde_json::from_str::<DepthSide>("\"A\"").unwrap(),
+            DepthSide::Ask
+        );
+    }
+
+    #[test]
+    fn depth_side_from_integer() {
+        assert_eq!(serde_json::from_str::<DepthSide>("0").unwrap(), DepthSide::Bid);
+        assert_eq!(serde_json::from_str::<DepthSide>("1").unwrap(), DepthSide::Ask);
+    }
+
+    #[test]
+    fn depth_side_negative_integer_rejected() {
+        assert!(serde_json::from_str::<DepthSide>("-1").is_err());
+    }
+
+    #[test]
+    fn depth_side_unknown_integer_rejected() {
+        assert!(serde_json::from_str::<DepthSide>("99").is_err());
     }
 }
