@@ -59,8 +59,10 @@ Balance, MarginInfo, MarginDetail, Position, RiskInfo, Order, OrderFill
 Pattern: `#[serde(rename = "accountId", alias = "a")]`
 `rename` sets the canonical (REST) wire name; `alias` accepts the streaming abbreviation. Serialization always uses `rename`.
 
-**Shared types** (identical across REST and streaming):
-QuoteFull, Depth/DepthLevel, TradeBar, TickBar, TimeBar, VolumeBar
+**Shared types** (streaming-only short wire names):
+QuoteFull, Depth/DepthLevel, TradeBar, TickBar, TimeBar, VolumeBar, TradeOpt, IndicatorValues
+
+Pattern: `#[serde(rename = "s")] pub symbol: Symbol` — always use descriptive Rust field names, never expose short wire names as field identifiers. Map via `#[serde(rename = "wire_name")]`.
 
 **Separate types** (cannot unify):
 `Trade` (REST) vs `TradeOpt` (streaming) — different tick direction enum types + 5 extra streaming-only fields.
@@ -92,6 +94,7 @@ QuoteFull, Depth/DepthLevel, TradeBar, TickBar, TimeBar, VolumeBar
 - Avoid `unwrap()`/`expect()` in library code. Reserve for tests only.
 - Use `#[must_use]` on functions returning values that shouldn't be silently dropped.
 - Never derive `Debug` on types holding secrets (credentials, tokens). Use manual impls that redact sensitive fields.
+- **Field naming**: always use descriptive Rust names for struct fields, never short wire names. Map to wire format via `#[serde(rename = "wire_name")]` or `#[serde(rename = "camelCase", alias = "short")]`.
 
 ### Performance
 - Minimize allocations on the hot path (streaming message deserialization).
