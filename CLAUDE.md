@@ -68,7 +68,7 @@ Pattern: `#[serde(rename = "s")] pub symbol: Symbol` — always use descriptive 
 `Trade` (REST) vs `TradeOpt` (streaming) — different tick direction enum types + 5 extra streaming-only fields.
 
 **Dual-format enums** (REST sends strings, streaming sends integers):
-`RegCodeType`, `BalanceType` — custom `Deserialize` impls that accept both string (`"COMBINED"`) and integer (`1`) representations. Serialize always uses strings. Add the same pattern for any enum that appears in both REST and streaming responses with differing wire formats.
+`RegCodeType`, `BalanceType`, `ResponseStatus`, `DepthSide` — custom `Deserialize` impls that accept both string (`"COMBINED"`) and integer (`1`) representations. Serialize always uses strings. Add the same pattern for any enum that appears in both REST and streaming responses with differing wire formats.
 
 **Time fields:**
 - API `Timestamp` (i64 ms epoch) → `time::OffsetDateTime` via `timestamp_ms` serde helper
@@ -146,6 +146,9 @@ Pattern: `#[serde(rename = "s")] pub symbol: Symbol` — always use descriptive 
 - `examples/` folder has runnable examples for each API domain, suitable for copy-paste.
 - Examples use `#[tokio::main]` and show error handling.
 - Keep doc examples in sync with actual API types. Run `cargo test --doc` to verify.
+
+### Maintenance
+- When fixing a review issue that reflects a missing or unclear convention, update this file so the same issue isn't repeated. CLAUDE.md is the source of truth for project standards.
 
 ### API Notes
 - Auth requires all three fields: username, password, and apiKey (spec says optional, but API rejects without all three).

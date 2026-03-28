@@ -15,7 +15,7 @@ use super::Client;
 pub use handler::StreamEvent;
 use subscriptions::{BarKind, MarketFeed};
 
-const CHANNEL_CAPACITY: usize = 256;
+const DEFAULT_CHANNEL_CAPACITY: usize = 256;
 
 // ---------------------------------------------------------------------------
 // StreamBuilder
@@ -41,9 +41,17 @@ const CHANNEL_CAPACITY: usize = 256;
 /// ```
 pub struct StreamBuilder<'a, H: HttpTransport> {
     client: &'a Client<H>,
+    channel_capacity: usize,
 }
 
 impl<'a, H: HttpTransport> StreamBuilder<'a, H> {
+    /// Set the event channel capacity (default: 256).
+    #[must_use]
+    pub fn channel_capacity(mut self, capacity: usize) -> Self {
+        self.channel_capacity = capacity;
+        self
+    }
+
     /// Create the stream session, open the WebSocket, and return a live
     /// [`StreamHandle`] for subscribing to feeds and receiving events.
     pub async fn start(self) -> Result<StreamHandle<H>> {
@@ -58,7 +66,7 @@ impl<'a, H: HttpTransport> StreamBuilder<'a, H> {
         let ws = connection::connect(&self.client.base_url, &stream_id, &token).await?;
 
         // 4. Spawn message loop.
-        let (tx, rx) = mpsc::channel(CHANNEL_CAPACITY);
+        let (tx, rx) = mpsc::channel(self.channel_capacity);
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
         let task = tokio::spawn(connection::message_loop(ws, tx, shutdown_rx));
 
@@ -91,7 +99,10 @@ impl<H: HttpTransport> Client<H> {
     /// ```
     #[must_use]
     pub fn stream(&self) -> StreamBuilder<'_, H> {
-        StreamBuilder { client: self }
+        StreamBuilder {
+            client: self,
+            channel_capacity: DEFAULT_CHANNEL_CAPACITY,
+        }
     }
 }
 

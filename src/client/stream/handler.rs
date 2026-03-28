@@ -51,65 +51,28 @@ pub enum StreamEvent {
 
 impl StreamResponse {
     /// Extract all populated fields into individual [`StreamEvent`] values.
+    ///
+    /// Uses chained iterators to avoid heap allocation on the hot path.
     pub(crate) fn into_events(self) -> impl Iterator<Item = StreamEvent> {
-        let mut events = Vec::new();
-
-        if let Some(v) = self.ping {
-            events.push(StreamEvent::Ping(v));
-        }
-        if let Some(v) = self.quotes {
-            events.push(StreamEvent::Quotes(v));
-        }
-        if let Some(v) = self.depths {
-            events.push(StreamEvent::Depth(v));
-        }
-        if let Some(v) = self.trades {
-            events.push(StreamEvent::Trades(v));
-        }
-        if let Some(v) = self.orders {
-            events.push(StreamEvent::Orders(v));
-        }
-        if let Some(v) = self.fills {
-            events.push(StreamEvent::Fills(v));
-        }
-        if let Some(v) = self.positions {
-            events.push(StreamEvent::Positions(v));
-        }
-        if let Some(v) = self.all_positions {
-            events.push(StreamEvent::AllPositions(v));
-        }
-        if let Some(v) = self.balance {
-            events.push(StreamEvent::Balance(Box::new(v)));
-        }
-        if let Some(v) = self.all_balances {
-            events.push(StreamEvent::AllBalances(v));
-        }
-        if let Some(v) = self.risk {
-            events.push(StreamEvent::Risk(v));
-        }
-        if let Some(v) = self.all_risk {
-            events.push(StreamEvent::AllRisk(v));
-        }
-        if let Some(v) = self.trade_bars {
-            events.push(StreamEvent::TradeBars(v));
-        }
-        if let Some(v) = self.tick_bars {
-            events.push(StreamEvent::TickBars(v));
-        }
-        if let Some(v) = self.time_bars {
-            events.push(StreamEvent::TimeBars(v));
-        }
-        if let Some(v) = self.volume_bars {
-            events.push(StreamEvent::VolumeBars(v));
-        }
-        if let Some(v) = self.indicators {
-            events.push(StreamEvent::Indicators(v));
-        }
-        if let Some(v) = self.notification {
-            events.push(StreamEvent::Notification(v));
-        }
-
-        events.into_iter()
+        std::iter::empty()
+            .chain(self.ping.map(StreamEvent::Ping))
+            .chain(self.quotes.map(StreamEvent::Quotes))
+            .chain(self.depths.map(StreamEvent::Depth))
+            .chain(self.trades.map(StreamEvent::Trades))
+            .chain(self.orders.map(StreamEvent::Orders))
+            .chain(self.fills.map(StreamEvent::Fills))
+            .chain(self.positions.map(StreamEvent::Positions))
+            .chain(self.all_positions.map(StreamEvent::AllPositions))
+            .chain(self.balance.map(|v| StreamEvent::Balance(Box::new(v))))
+            .chain(self.all_balances.map(StreamEvent::AllBalances))
+            .chain(self.risk.map(StreamEvent::Risk))
+            .chain(self.all_risk.map(StreamEvent::AllRisk))
+            .chain(self.trade_bars.map(StreamEvent::TradeBars))
+            .chain(self.tick_bars.map(StreamEvent::TickBars))
+            .chain(self.time_bars.map(StreamEvent::TimeBars))
+            .chain(self.volume_bars.map(StreamEvent::VolumeBars))
+            .chain(self.indicators.map(StreamEvent::Indicators))
+            .chain(self.notification.map(StreamEvent::Notification))
     }
 }
 
