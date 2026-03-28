@@ -77,7 +77,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    stream.close().await?;
     client.logout().await?;
 
     Ok(())
