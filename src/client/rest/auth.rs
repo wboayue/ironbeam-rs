@@ -24,7 +24,7 @@ pub async fn authenticate(
     let uri = format!("{base_url}/auth").parse()?;
     let body = Bytes::from(serde_json::to_vec(&request)?);
 
-    let (status, resp_bytes) = http.post(uri, body, &HeaderMap::new()).await?;
+    let (status, resp_bytes) = http.send("POST", uri, Some(body), &HeaderMap::new()).await?;
 
     if !status.is_success() {
         return Err(Error::Api {
@@ -51,7 +51,7 @@ pub async fn authenticate(
 /// Invalidate the bearer token.
 pub async fn logout(http: &impl HttpTransport, base_url: &str, headers: &HeaderMap) -> Result<()> {
     let uri = format!("{base_url}/logout").parse()?;
-    let (status, resp_bytes) = http.post(uri, Bytes::from_static(b"{}"), headers).await?;
+    let (status, resp_bytes) = http.send("POST", uri, Some(Bytes::from_static(b"{}")), headers).await?;
 
     if !status.is_success() {
         return Err(Error::Api {

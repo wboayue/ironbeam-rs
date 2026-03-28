@@ -15,22 +15,11 @@ use crate::error::{Error, Result};
 /// Implementors must be cloneable and thread-safe (needed by `Client`'s `Drop`
 /// impl which spawns a background logout task via `tokio::spawn`).
 pub trait HttpTransport: Clone + Send + Sync + 'static {
-    fn get(
+    fn send(
         &self,
+        method: &str,
         uri: Uri,
-        headers: &HeaderMap,
-    ) -> impl Future<Output = Result<(StatusCode, Bytes)>> + Send;
-
-    fn post(
-        &self,
-        uri: Uri,
-        body: Bytes,
-        headers: &HeaderMap,
-    ) -> impl Future<Output = Result<(StatusCode, Bytes)>> + Send;
-
-    fn delete(
-        &self,
-        uri: Uri,
+        body: Option<Bytes>,
         headers: &HeaderMap,
     ) -> impl Future<Output = Result<(StatusCode, Bytes)>> + Send;
 }
@@ -64,64 +53,32 @@ impl HttpClient {
 }
 
 impl HttpTransport for HttpClient {
-    async fn get(&self, uri: Uri, headers: &HeaderMap) -> Result<(StatusCode, Bytes)> {
-        let mut builder = hyper::Request::builder().method("GET").uri(uri);
-
-        for (key, value) in headers {
-            builder = builder.header(key, value);
-        }
-
-        let req = builder
-            .body(Full::new(Bytes::new()))
-            .map_err(|e: hyper::http::Error| Error::Other(e.to_string()))?;
-
-        let resp: Response<Incoming> = self.inner.request(req).await?;
-        let status = resp.status();
-        let body = resp.into_body().collect().await?.to_bytes();
-
-        Ok((status, body))
-    }
-
-    async fn post(
+    async fn send(
         &self,
+        method: &str,
         uri: Uri,
-        body: Bytes,
+        body: Option<Bytes>,
         headers: &HeaderMap,
     ) -> Result<(StatusCode, Bytes)> {
-        let mut builder = hyper::Request::builder().method("POST").uri(&uri);
+        let mut builder = hyper::Request::builder().method(method).uri(uri);
 
-        builder = builder.header(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        if body.is_some() {
+            builder =
+                builder.header(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        }
         for (key, value) in headers {
             builder = builder.header(key, value);
         }
 
         let req = builder
-            .body(Full::new(body))
+            .body(Full::new(body.unwrap_or_default()))
             .map_err(|e: hyper::http::Error| Error::Other(e.to_string()))?;
 
         let resp: Response<Incoming> = self.inner.request(req).await?;
         let status = resp.status();
-        let body = resp.into_body().collect().await?.to_bytes();
+        let resp_body = resp.into_body().collect().await?.to_bytes();
 
-        Ok((status, body))
-    }
-
-    async fn delete(&self, uri: Uri, headers: &HeaderMap) -> Result<(StatusCode, Bytes)> {
-        let mut builder = hyper::Request::builder().method("DELETE").uri(uri);
-
-        for (key, value) in headers {
-            builder = builder.header(key, value);
-        }
-
-        let req = builder
-            .body(Full::new(Bytes::new()))
-            .map_err(|e: hyper::http::Error| Error::Other(e.to_string()))?;
-
-        let resp: Response<Incoming> = self.inner.request(req).await?;
-        let status = resp.status();
-        let body = resp.into_body().collect().await?.to_bytes();
-
-        Ok((status, body))
+        Ok((status, resp_body))
     }
 }
 
@@ -140,7 +97,7 @@ pub(crate) mod mock {
     /// Record of a single HTTP call.
     #[derive(Debug, Clone)]
     pub struct RecordedRequest {
-        pub method: &'static str,
+        pub method: String,
         pub uri: Uri,
         pub headers: HeaderMap,
         pub body: Bytes,
@@ -198,39 +155,18 @@ pub(crate) mod mock {
     }
 
     impl HttpTransport for MockHttp {
-        async fn get(&self, uri: Uri, headers: &HeaderMap) -> Result<(StatusCode, Bytes)> {
-            self.requests.lock().unwrap().push(RecordedRequest {
-                method: "GET",
-                uri,
-                headers: headers.clone(),
-                body: Bytes::new(),
-            });
-            let r = self.next_response();
-            Ok((r.status, r.body))
-        }
-
-        async fn post(
+        async fn send(
             &self,
+            method: &str,
             uri: Uri,
-            body: Bytes,
+            body: Option<Bytes>,
             headers: &HeaderMap,
         ) -> Result<(StatusCode, Bytes)> {
             self.requests.lock().unwrap().push(RecordedRequest {
-                method: "POST",
+                method: method.to_owned(),
                 uri,
                 headers: headers.clone(),
-                body,
-            });
-            let r = self.next_response();
-            Ok((r.status, r.body))
-        }
-
-        async fn delete(&self, uri: Uri, headers: &HeaderMap) -> Result<(StatusCode, Bytes)> {
-            self.requests.lock().unwrap().push(RecordedRequest {
-                method: "DELETE",
-                uri,
-                headers: headers.clone(),
-                body: Bytes::new(),
+                body: body.unwrap_or_default(),
             });
             let r = self.next_response();
             Ok((r.status, r.body))
