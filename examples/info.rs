@@ -84,6 +84,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         strategy.id, strategy.minimum, strategy.maximum
     );
 
+    // Explicit logout preferred over drop-based cleanup for guaranteed session teardown.
     client.logout().await?;
 
     Ok(())

@@ -2,7 +2,7 @@ use serde::de::DeserializeOwned;
 
 use crate::client::Client;
 use crate::client::http::HttpTransport;
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::types::{
     ComplexGroupInfo, ComplexGroups, ComplexGroupsResponse, ComplexesResponse,
     ExchangeSourcesResponse, FutureInfo, SecurityDefinition, SecurityDefinitionsResponse,
@@ -32,7 +32,7 @@ use crate::types::{
 #[derive(Debug, Default, Clone)]
 pub struct SymbolSearchParams<'a> {
     text: Option<&'a str>,
-    limit: Option<i32>,
+    limit: Option<u32>,
     prefer_active: Option<bool>,
 }
 
@@ -52,7 +52,7 @@ impl<'a> SymbolSearchParams<'a> {
 
     /// Limit number of results.
     #[must_use]
-    pub fn limit(mut self, limit: i32) -> Self {
+    pub fn limit(mut self, limit: u32) -> Self {
         self.limit = Some(limit);
         self
     }
@@ -89,11 +89,20 @@ impl<'a> SymbolSearchParams<'a> {
 
 impl<H: HttpTransport> Client<H> {
     /// Shared helper for `/info/security/{kind}?symbols=` endpoints.
+    ///
+    /// Validates that `symbols` is non-empty and contains at most 10 entries
+    /// (API limit).
     async fn security_query<T: DeserializeOwned>(
         &self,
         kind: &str,
         symbols: &[&str],
     ) -> Result<T> {
+        if symbols.is_empty() {
+            return Err(Error::Other("symbols must not be empty".into()));
+        }
+        if symbols.len() > 10 {
+            return Err(Error::Other("symbols is limited to 10".into()));
+        }
         let joined = symbols.join(",");
         let encoded = urlencoding::encode(&joined);
         self.get(&format!("/info/security/{kind}?symbols={encoded}"))
@@ -676,6 +685,44 @@ mod tests {
 
         let reqs = client.request.http.recorded_requests();
         assert!(reqs[0].uri.to_string().ends_with("/info/symbols"));
+    }
+
+    #[tokio::test]
+    async fn symbols_sends_partial_query_params() {
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"symbols":[]}"#)]);
+        let client = test_client_with_auth(mock);
+
+        client
+            .symbols(&SymbolSearchParams::new().limit(10))
+            .await
+            .unwrap();
+
+        let reqs = client.request.http.recorded_requests();
+        let uri = reqs[0].uri.to_string();
+        assert!(uri.contains("limit=10"));
+        assert!(!uri.contains("text="));
+        assert!(!uri.contains("preferActive="));
+    }
+
+    // --- security validation ---
+
+    #[tokio::test]
+    async fn security_query_rejects_empty_symbols() {
+        let mock = MockHttp::new(vec![]);
+        let client = test_client_with_auth(mock);
+
+        let err = client.security_definitions(&[]).await.unwrap_err();
+        assert!(matches!(err, Error::Other(msg) if msg.contains("empty")));
+    }
+
+    #[tokio::test]
+    async fn security_query_rejects_over_ten_symbols() {
+        let mock = MockHttp::new(vec![]);
+        let client = test_client_with_auth(mock);
+
+        let syms: Vec<&str> = (0..11).map(|_| "XCME:ES.U16").collect();
+        let err = client.security_definitions(&syms).await.unwrap_err();
+        assert!(matches!(err, Error::Other(msg) if msg.contains("10")));
     }
 
     // --- exchange_sources ---
