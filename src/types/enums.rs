@@ -229,11 +229,55 @@ pub enum Side {
     Ask,
 }
 
-/// Market side (short form).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum SideShort {
-    B,
-    A,
+/// Depth side.
+///
+/// REST/strings use `"B"` (bid) / `"A"` (ask), streaming sends integers (`0` / `1`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+pub enum DepthSide {
+    #[serde(rename = "B")]
+    Bid,
+    #[serde(rename = "A")]
+    Ask,
+}
+
+impl<'de> Deserialize<'de> for DepthSide {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct DepthSideVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for DepthSideVisitor {
+            type Value = DepthSide;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a string (\"B\"/\"A\") or integer (0/1) depth side")
+            }
+
+            fn visit_u64<E: serde::de::Error>(self, v: u64) -> std::result::Result<DepthSide, E> {
+                match v {
+                    0 => Ok(DepthSide::Bid),
+                    1 => Ok(DepthSide::Ask),
+                    _ => Err(E::custom(format!("unknown depth side integer: {v}"))),
+                }
+            }
+
+            fn visit_i64<E: serde::de::Error>(self, v: i64) -> std::result::Result<DepthSide, E> {
+                let v = u64::try_from(v).map_err(|_| E::custom(format!("negative depth side: {v}")))?;
+                self.visit_u64(v)
+            }
+
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> std::result::Result<DepthSide, E> {
+                match v {
+                    "B" => Ok(DepthSide::Bid),
+                    "A" => Ok(DepthSide::Ask),
+                    _ => Err(E::custom(format!("unknown depth side string: {v}"))),
+                }
+            }
+        }
+
+        deserializer.deserialize_any(DepthSideVisitor)
+    }
 }
 
 /// Regulatory code type.

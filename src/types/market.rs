@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 use time::{Date, OffsetDateTime};
 
 use super::{
-    AggressorSideType, BlockTrade, InvestigationStatus, Symbol, SystemPricedTrade, TickDirection,
-    TickDirectionType, option_date_yyyymmdd, option_timestamp_ms,
+    AggressorSideType, BlockTrade, DepthSide, InvestigationStatus, Symbol, SystemPricedTrade,
+    TickDirection, TickDirectionType, option_date_yyyymmdd, option_timestamp_ms,
 };
 
 /// Full market quote. Used in both REST and streaming.
@@ -181,9 +181,9 @@ pub struct DepthLevel {
     #[serde(rename = "t", default, with = "option_timestamp_ms")]
     pub time: Option<OffsetDateTime>,
 
-    /// Side ("B" or "A").
+    /// Side (bid or ask).
     #[serde(rename = "s")]
-    pub side: String,
+    pub side: DepthSide,
 
     /// Price.
     #[serde(rename = "p")]

@@ -4,16 +4,21 @@ use std::error::Error;
 use ironbeam_rs::client::stream::StreamEvent;
 use ironbeam_rs::client::{Client, Credentials};
 
-/// Stream real-time quotes from the Ironbeam API.
+/// Stream real-time market data (quotes, depth, trades) from the Ironbeam API.
 ///
-/// Set IRONBEAM_USERNAME, IRONBEAM_PASSWORD, and IRONBEAM_API_KEY environment variables before running:
+/// Usage:
 ///
 /// ```sh
-/// cargo run --example streaming
+/// cargo run --example streaming_market_data -- [quote|depth|trades]
 /// ```
+///
+/// Defaults to `quote` if no argument is given.
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     tracing_subscriber::fmt().with_max_level(tracing::Level::DEBUG).init();
+
+    let stream_type = env::args().nth(1).unwrap_or_else(|| "quote".into());
+
     let client = Client::builder()
         .credentials(Credentials {
             username: env::var("IRONBEAM_USERNAME")?,
@@ -28,26 +33,47 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Stream created: {}", stream.stream_id());
 
     // Update to the current front-month contract (e.g. ES.Z26 for Dec 2026).
-    stream.subscribe_quotes(&["XCME:ES.U26"]).await?;
-    println!("Subscribed to quotes");
+    let symbols = &["XCME:ES.U26"];
 
-    let mut count = 0;
+    match stream_type.as_str() {
+        "quote" => {
+            stream.subscribe_quotes(symbols).await?;
+            println!("Subscribed to quotes");
+        }
+        "depth" => {
+            stream.subscribe_depth(symbols).await?;
+            println!("Subscribed to depth");
+        }
+        "trades" => {
+            stream.subscribe_trades(symbols).await?;
+            println!("Subscribed to trades");
+        }
+        other => {
+            eprintln!("Unknown stream type: {other}. Use quote, depth, or trades.");
+            std::process::exit(1);
+        }
+    }
+
     while let Some(event) = stream.next().await {
         match event? {
             StreamEvent::Quotes(quotes) => {
                 for q in &quotes {
                     println!("Quote {}: last={:?} bid={:?} ask={:?}", q.symbol, q.last_price, q.bid, q.ask);
                 }
-                count += 1;
-                if count >= 5 {
-                    break;
+            }
+            StreamEvent::Depth(depths) => {
+                for d in &depths {
+                    println!("Depth {}: bids={} asks={}", d.symbol, d.bids.len(), d.asks.len());
+                }
+            }
+            StreamEvent::Trades(trades) => {
+                for t in &trades {
+                    println!("Trade {}: price={:?} size={:?}", t.symbol, t.price, t.size);
                 }
             }
             StreamEvent::Ping(_) => println!("keepalive"),
             StreamEvent::Notification(r) => println!("notification: {:?} {:?}", r.status, r.message),
-            event => {
-                println!("other event: {:?}", event);
-            }
+            _ => {}
         }
     }
 
