@@ -1,12 +1,12 @@
 use serde::{Deserialize, Serialize};
 
+use super::account::AccountPositions;
+use super::common::{PingMessage, Response};
+use super::order::Order;
 use super::{
     Balance, BarType, Depth, OrderFill, Position, QuoteFull, RiskInfo, Symbol, TickBar, TimeBar,
     TradeBar, TradeOpt, VolumeBar,
 };
-use super::account::AccountPositions;
-use super::common::{PingMessage, Response};
-use super::order::Order;
 
 /// WebSocket stream response envelope.
 ///

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-use super::{DurationType, OrderSide, OrderStatusType, OrderType, Symbol};
 use super::common::OrderError;
+use super::{DurationType, OrderSide, OrderStatusType, OrderType, Symbol};
 
 /// Order. Unified across REST and streaming.
 ///

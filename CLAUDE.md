@@ -91,6 +91,7 @@ QuoteFull, Depth/DepthLevel, TradeBar, TickBar, TimeBar, VolumeBar
 - Use builders for complex request construction (e.g., `OrderRequestBuilder`).
 - Avoid `unwrap()`/`expect()` in library code. Reserve for tests only.
 - Use `#[must_use]` on functions returning values that shouldn't be silently dropped.
+- Never derive `Debug` on types holding secrets (credentials, tokens). Use manual impls that redact sensitive fields.
 
 ### Performance
 - Minimize allocations on the hot path (streaming message deserialization).
@@ -98,19 +99,47 @@ QuoteFull, Depth/DepthLevel, TradeBar, TickBar, TimeBar, VolumeBar
 - Prefer `Bytes` / `&[u8]` for WebSocket frame handling.
 - Connection pooling and keep-alive for HTTP client.
 - Pre-allocate buffers for expected message sizes.
+- Cache per-connection state (e.g., auth headers) at construction time, not per-request.
 
 ### Error Handling
 - Define `Error` enum in `error.rs` with variants for: HTTP, WebSocket, Auth, Deserialization, Api (status + message), Timeout.
 - Map API error responses (400, 401, 403, 429, 500) to typed variants with status code and body.
 - Never panic. Never `unwrap()` outside tests.
+- Library `Error` must not include application-only concerns (e.g., `env::VarError`). Examples use `Box<dyn Error>`.
 
 ### Testing
 - Aim for 80%+ coverage.
 - Unit tests inline (`#[cfg(test)]` modules) for serde round-trips and business logic.
 - Integration tests in `tests/` using recorded API responses (no live calls in CI).
 - All public methods must have rustdoc with `# Examples` showing async usage.
+- Use `MockHttp` (`src/client/http.rs::mock`) for all HTTP tests — no live calls.
+  - Pre-load canned responses: `MockHttp::new(vec![MockResponse::ok(body), ...])`.
+  - Responses are consumed FIFO; empty queue panics (catches unexpected calls).
+  - Inspect after: `mock.recorded_requests()` returns `Vec<RecordedRequest>` with method, uri, headers, body.
+- Build test clients with `Client { base_url, auth_headers, http: mock, is_logged_out: AtomicBool::new(false) }`.
+- Test each error branch: HTTP-level errors (non-2xx → `Error::Api`), body-level errors (status field → `Error::Auth`), malformed JSON → `Error::Json`.
+- Verify auth headers are forwarded by asserting on `recorded_requests()[n].headers`.
 
 ### Documentation
 - All public types and methods get rustdoc with inline examples.
+- Public API methods on `Client` must include a `# Example` section with a `no_run` doc test showing async usage. Use hidden setup lines (`# `) for builder/connect boilerplate so the visible example focuses on the method call:
+  ```rust
+  /// # Example
+  ///
+  /// ```no_run
+  /// # use ironbeam_rs::client::{Client, Credentials};
+  /// # async fn example() -> ironbeam_rs::error::Result<()> {
+  /// # let client = Client::builder()
+  /// #     .credentials(Credentials { username: "u".into(), password: "p".into(), api_key: "k".into() })
+  /// #     .connect().await?;
+  /// let accounts = client.all_accounts().await?;
+  /// # Ok(())
+  /// # }
+  /// ```
+  ```
 - `examples/` folder has runnable examples for each API domain, suitable for copy-paste.
 - Examples use `#[tokio::main]` and show error handling.
+- Keep doc examples in sync with actual API types. Run `cargo test --doc` to verify.
+
+### API Notes
+- Auth requires all three fields: username, password, and apiKey (spec says optional, but API rejects without all three).

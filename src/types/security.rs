@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 
 use super::{
-    option_timestamp_ms, ExchangeStrategyType, OptionExpirationType, OptionType, RegCodeType,
-    SecurityStatusType, SecurityType, Side, Symbol,
+    ExchangeStrategyType, OptionExpirationType, OptionType, RegCodeType, SecurityStatusType,
+    SecurityType, Side, Symbol, option_timestamp_ms,
 };
 
 /// Security definition.

@@ -326,38 +326,74 @@ mod tests {
         assert_eq!(serde_json::to_string(&OrderType::Market).unwrap(), "\"1\"");
         assert_eq!(serde_json::to_string(&OrderType::Limit).unwrap(), "\"2\"");
         assert_eq!(serde_json::to_string(&OrderType::Stop).unwrap(), "\"3\"");
-        assert_eq!(serde_json::to_string(&OrderType::StopLimit).unwrap(), "\"4\"");
+        assert_eq!(
+            serde_json::to_string(&OrderType::StopLimit).unwrap(),
+            "\"4\""
+        );
         assert_eq!(serde_json::to_string(&OrderType::Invalid).unwrap(), "\"\"");
 
-        assert_eq!(serde_json::from_str::<OrderType>("\"1\"").unwrap(), OrderType::Market);
-        assert_eq!(serde_json::from_str::<OrderType>("\"\"").unwrap(), OrderType::Invalid);
+        assert_eq!(
+            serde_json::from_str::<OrderType>("\"1\"").unwrap(),
+            OrderType::Market
+        );
+        assert_eq!(
+            serde_json::from_str::<OrderType>("\"\"").unwrap(),
+            OrderType::Invalid
+        );
     }
 
     #[test]
     fn duration_type_round_trip() {
         assert_eq!(serde_json::to_string(&DurationType::Day).unwrap(), "\"0\"");
-        assert_eq!(serde_json::to_string(&DurationType::GoodTillCancel).unwrap(), "\"1\"");
-        assert_eq!(serde_json::from_str::<DurationType>("\"0\"").unwrap(), DurationType::Day);
-        assert_eq!(serde_json::from_str::<DurationType>("\"\"").unwrap(), DurationType::Invalid);
+        assert_eq!(
+            serde_json::to_string(&DurationType::GoodTillCancel).unwrap(),
+            "\"1\""
+        );
+        assert_eq!(
+            serde_json::from_str::<DurationType>("\"0\"").unwrap(),
+            DurationType::Day
+        );
+        assert_eq!(
+            serde_json::from_str::<DurationType>("\"\"").unwrap(),
+            DurationType::Invalid
+        );
     }
 
     #[test]
     fn security_status_type_round_trip() {
-        assert_eq!(serde_json::to_string(&SecurityStatusType::Open).unwrap(), "17");
-        assert_eq!(serde_json::from_str::<SecurityStatusType>("17").unwrap(), SecurityStatusType::Open);
-        assert_eq!(serde_json::from_str::<SecurityStatusType>("126").unwrap(), SecurityStatusType::PostClose);
+        assert_eq!(
+            serde_json::to_string(&SecurityStatusType::Open).unwrap(),
+            "17"
+        );
+        assert_eq!(
+            serde_json::from_str::<SecurityStatusType>("17").unwrap(),
+            SecurityStatusType::Open
+        );
+        assert_eq!(
+            serde_json::from_str::<SecurityStatusType>("126").unwrap(),
+            SecurityStatusType::PostClose
+        );
     }
 
     #[test]
     fn aggressor_side_round_trip() {
         assert_eq!(serde_json::to_string(&AggressorSideType::Buy).unwrap(), "1");
-        assert_eq!(serde_json::from_str::<AggressorSideType>("2").unwrap(), AggressorSideType::Sell);
+        assert_eq!(
+            serde_json::from_str::<AggressorSideType>("2").unwrap(),
+            AggressorSideType::Sell
+        );
     }
 
     #[test]
     fn tick_direction_type_round_trip() {
-        assert_eq!(serde_json::to_string(&TickDirectionType::Invalid).unwrap(), "255");
-        assert_eq!(serde_json::from_str::<TickDirectionType>("0").unwrap(), TickDirectionType::Plus);
+        assert_eq!(
+            serde_json::to_string(&TickDirectionType::Invalid).unwrap(),
+            "255"
+        );
+        assert_eq!(
+            serde_json::from_str::<TickDirectionType>("0").unwrap(),
+            TickDirectionType::Plus
+        );
     }
 
     #[test]
@@ -374,12 +410,18 @@ mod tests {
 
     #[test]
     fn exchange_strategy_digit_prefix() {
-        assert_eq!(serde_json::to_string(&ExchangeStrategyType::ThreeWay).unwrap(), "\"3W\"");
+        assert_eq!(
+            serde_json::to_string(&ExchangeStrategyType::ThreeWay).unwrap(),
+            "\"3W\""
+        );
         assert_eq!(
             serde_json::from_str::<ExchangeStrategyType>("\"3W\"").unwrap(),
             ExchangeStrategyType::ThreeWay
         );
-        assert_eq!(serde_json::to_string(&ExchangeStrategyType::OneTwo).unwrap(), "\"12\"");
+        assert_eq!(
+            serde_json::to_string(&ExchangeStrategyType::OneTwo).unwrap(),
+            "\"12\""
+        );
     }
 
     #[test]
@@ -393,7 +435,10 @@ mod tests {
 
     #[test]
     fn response_status_round_trip() {
-        assert_eq!(serde_json::to_string(&ResponseStatus::Ok).unwrap(), "\"OK\"");
+        assert_eq!(
+            serde_json::to_string(&ResponseStatus::Ok).unwrap(),
+            "\"OK\""
+        );
         assert_eq!(
             serde_json::from_str::<ResponseStatus>("\"ERROR\"").unwrap(),
             ResponseStatus::Error

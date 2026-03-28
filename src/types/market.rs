@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 
 use super::{
-    option_timestamp_ms, AggressorSideType, BlockTrade, InvestigationStatus, Symbol,
-    SystemPricedTrade, TickDirection, TickDirectionType,
+    AggressorSideType, BlockTrade, InvestigationStatus, Symbol, SystemPricedTrade, TickDirection,
+    TickDirectionType, option_timestamp_ms,
 };
 
 /// Full market quote. Used in both REST and streaming (already uses short field names).
@@ -433,7 +433,8 @@ mod tests {
 
     #[test]
     fn trade_bar_deserialize() {
-        let json = r#"{"t":1705322400000,"o":4500.0,"h":4510.0,"l":4495.0,"c":4505.0,"v":1000.0,"tc":50}"#;
+        let json =
+            r#"{"t":1705322400000,"o":4500.0,"h":4510.0,"l":4495.0,"c":4505.0,"v":1000.0,"tc":50}"#;
         let bar: TradeBar = serde_json::from_str(json).unwrap();
         assert!(bar.t.is_some());
         assert_eq!(bar.o, Some(4500.0));
