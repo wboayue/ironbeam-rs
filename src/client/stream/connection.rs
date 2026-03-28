@@ -28,7 +28,7 @@ pub(crate) trait WsTransport: Send + 'static {
 pub(crate) enum WsMessage {
     Text(Bytes),
     Binary(Bytes),
-    Close,
+    Close(Option<String>),
 }
 
 /// Production WebSocket transport using fastwebsockets.
@@ -38,17 +38,30 @@ pub(crate) struct FastWs {
 
 impl WsTransport for FastWs {
     async fn read_frame(&mut self) -> Result<WsMessage> {
-        let frame = self
-            .inner
-            .read_frame()
-            .await
-            .map_err(|e| Error::WebSocket(e.to_string()))?;
+        loop {
+            let frame = self
+                .inner
+                .read_frame()
+                .await
+                .map_err(|e| Error::WebSocket(e.to_string()))?;
 
-        match frame.opcode {
-            OpCode::Text => Ok(WsMessage::Text(Bytes::copy_from_slice(&frame.payload))),
-            OpCode::Binary => Ok(WsMessage::Binary(Bytes::copy_from_slice(&frame.payload))),
-            OpCode::Close => Ok(WsMessage::Close),
-            _ => Ok(WsMessage::Close),
+            match frame.opcode {
+                OpCode::Text => return Ok(WsMessage::Text(Bytes::from(Vec::from(frame.payload)))),
+                OpCode::Binary => {
+                    return Ok(WsMessage::Binary(Bytes::from(Vec::from(frame.payload))))
+                }
+                OpCode::Close => {
+                    let reason = if frame.payload.len() > 2 {
+                        String::from_utf8(frame.payload[2..].to_vec()).ok()
+                    } else {
+                        None
+                    };
+                    return Ok(WsMessage::Close(reason));
+                }
+                other => {
+                    tracing::debug!(?other, "ignoring unexpected WebSocket opcode");
+                }
+            }
         }
     }
 
@@ -139,8 +152,9 @@ pub(crate) async fn message_loop<W: WsTransport>(
                             }
                         }
                     }
-                    Ok(WsMessage::Close) => {
-                        let _ = tx.send(Err(Error::WebSocket("connection closed by server".into()))).await;
+                    Ok(WsMessage::Close(reason)) => {
+                        let msg = reason.unwrap_or_else(|| "connection closed by server".into());
+                        let _ = tx.send(Err(Error::WebSocket(msg))).await;
                         return;
                     }
                     Err(e) => {
@@ -213,7 +227,7 @@ pub(crate) mod mock {
                 .iter()
                 .map(|m| Ok(WsMessage::Text(Bytes::from(m.to_string()))))
                 .collect();
-            frames.push(Ok(WsMessage::Close));
+            frames.push(Ok(WsMessage::Close(None)));
             Self::new(frames)
         }
     }
@@ -222,7 +236,7 @@ pub(crate) mod mock {
         async fn read_frame(&mut self) -> Result<WsMessage> {
             match self.frames.pop_front() {
                 Some(frame) => frame,
-                None => Ok(WsMessage::Close),
+                None => Ok(WsMessage::Close(None)),
             }
         }
 
@@ -268,19 +282,31 @@ mod tests {
 
         // Close event
         let event = rx.recv().await.unwrap();
-        assert!(event.is_err());
+        assert!(matches!(event, Err(Error::WebSocket(..))));
     }
 
     #[tokio::test]
     async fn message_loop_handles_bad_json() {
-        let ws = MockWsTransport::from_json(&["not valid json"]);
+        let ws = MockWsTransport::from_json(&[
+            "not valid json",
+            r#"{"p":{"ping":"ok"}}"#,
+        ]);
         let (tx, mut rx) = mpsc::channel(16);
         let (_shutdown_tx, shutdown_rx) = watch::channel(false);
 
         tokio::spawn(message_loop(ws, tx, shutdown_rx));
 
+        // First event: JSON error
         let event = rx.recv().await.unwrap();
         assert!(matches!(event, Err(Error::Json(..))));
+
+        // Loop continues — next valid frame arrives
+        let event = rx.recv().await.unwrap().unwrap();
+        assert!(matches!(event, StreamEvent::Ping(..)));
+
+        // Then close
+        let event = rx.recv().await.unwrap();
+        assert!(matches!(event, Err(Error::WebSocket(..))));
     }
 
     #[tokio::test]

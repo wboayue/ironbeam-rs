@@ -100,6 +100,14 @@ pub(crate) async fn unsubscribe_market<H: HttpTransport>(
         });
     }
 
+    let resp: SuccessResponse = serde_json::from_slice(&body)?;
+    if resp.status != crate::types::ResponseStatus::Ok {
+        return Err(Error::Api {
+            status: status.as_u16(),
+            message: resp.message.unwrap_or_default(),
+        });
+    }
+
     Ok(())
 }
 
@@ -262,6 +270,12 @@ mod tests {
             .uri
             .to_string()
             .contains("/indicator/stream-789/tradeBars/subscribe"));
+
+        let body: serde_json::Value = serde_json::from_slice(&reqs[0].body).unwrap();
+        assert_eq!(body["symbol"], "XCME:ES.U25");
+        assert_eq!(body["period"], 1);
+        assert_eq!(body["barType"], "MINUTE");
+        assert_eq!(body["loadSize"], 100);
     }
 
     #[tokio::test]
@@ -283,6 +297,46 @@ mod tests {
             reqs[0].uri.to_string(),
             "http://test/indicator/stream-1/unsubscribe/IND-ABC"
         );
+    }
+
+    #[tokio::test]
+    async fn subscribe_market_body_status_error() {
+        let mock = MockHttp::new(vec![MockResponse::ok(
+            r#"{"status":"ERROR","message":"invalid stream"}"#,
+        )]);
+
+        let result = subscribe_market(
+            &mock,
+            "http://test",
+            &test_headers(),
+            MarketFeed::Quotes,
+            "s1",
+            &["SYM"],
+        )
+        .await;
+
+        let err = result.unwrap_err();
+        assert!(matches!(err, Error::Api { status: 200, ref message } if message == "invalid stream"));
+    }
+
+    #[tokio::test]
+    async fn unsubscribe_market_body_status_error() {
+        let mock = MockHttp::new(vec![MockResponse::ok(
+            r#"{"status":"ERROR","message":"not subscribed"}"#,
+        )]);
+
+        let result = unsubscribe_market(
+            &mock,
+            "http://test",
+            &test_headers(),
+            MarketFeed::Quotes,
+            "s1",
+            &["SYM"],
+        )
+        .await;
+
+        let err = result.unwrap_err();
+        assert!(matches!(err, Error::Api { status: 200, ref message } if message == "not subscribed"));
     }
 
     #[tokio::test]

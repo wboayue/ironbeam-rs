@@ -26,7 +26,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut stream = client.stream().start().await?;
     println!("Stream created: {}", stream.stream_id());
 
-    stream.subscribe_quotes(&["XCME:ES.U25"]).await?;
+    // Update to the current front-month contract (e.g. ES.Z26 for Dec 2026).
+    stream.subscribe_quotes(&["XCME:ES.U26"]).await?;
     println!("Subscribed to quotes");
 
     let mut count = 0;

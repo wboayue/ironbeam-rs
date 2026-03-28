@@ -46,7 +46,8 @@ impl<'de> Deserialize<'de> for BalanceType {
             }
 
             fn visit_i64<E: serde::de::Error>(self, v: i64) -> std::result::Result<BalanceType, E> {
-                self.visit_u64(v as u64)
+                let v = u64::try_from(v).map_err(|_| E::custom(format!("negative balance type: {v}")))?;
+                self.visit_u64(v)
             }
 
             fn visit_str<E: serde::de::Error>(self, v: &str) -> std::result::Result<BalanceType, E> {
@@ -224,7 +225,8 @@ impl<'de> Deserialize<'de> for RegCodeType {
             }
 
             fn visit_i64<E: serde::de::Error>(self, v: i64) -> std::result::Result<RegCodeType, E> {
-                self.visit_u64(v as u64)
+                let v = u64::try_from(v).map_err(|_| E::custom(format!("negative reg code: {v}")))?;
+                self.visit_u64(v)
             }
 
             fn visit_str<E: serde::de::Error>(self, v: &str) -> std::result::Result<RegCodeType, E> {
@@ -543,5 +545,65 @@ mod tests {
             serde_json::from_str::<BalanceType>("\"START_OF_DAY\"").unwrap(),
             BalanceType::StartOfDay
         );
+    }
+
+    #[test]
+    fn balance_type_from_integer() {
+        assert_eq!(
+            serde_json::from_str::<BalanceType>("0").unwrap(),
+            BalanceType::CurrentOpen
+        );
+        assert_eq!(
+            serde_json::from_str::<BalanceType>("1").unwrap(),
+            BalanceType::StartOfDay
+        );
+    }
+
+    #[test]
+    fn balance_type_negative_integer_rejected() {
+        assert!(serde_json::from_str::<BalanceType>("-1").is_err());
+    }
+
+    #[test]
+    fn balance_type_unknown_integer_rejected() {
+        assert!(serde_json::from_str::<BalanceType>("99").is_err());
+    }
+
+    #[test]
+    fn reg_code_type_round_trip() {
+        assert_eq!(
+            serde_json::to_string(&RegCodeType::Combined).unwrap(),
+            "\"COMBINED\""
+        );
+        assert_eq!(
+            serde_json::from_str::<RegCodeType>("\"NON_SECURED\"").unwrap(),
+            RegCodeType::NonSecured
+        );
+    }
+
+    #[test]
+    fn reg_code_type_from_integer() {
+        assert_eq!(
+            serde_json::from_str::<RegCodeType>("0").unwrap(),
+            RegCodeType::Invalid
+        );
+        assert_eq!(
+            serde_json::from_str::<RegCodeType>("1").unwrap(),
+            RegCodeType::Combined
+        );
+        assert_eq!(
+            serde_json::from_str::<RegCodeType>("4").unwrap(),
+            RegCodeType::Secured
+        );
+    }
+
+    #[test]
+    fn reg_code_type_negative_integer_rejected() {
+        assert!(serde_json::from_str::<RegCodeType>("-1").is_err());
+    }
+
+    #[test]
+    fn reg_code_type_unknown_integer_rejected() {
+        assert!(serde_json::from_str::<RegCodeType>("99").is_err());
     }
 }

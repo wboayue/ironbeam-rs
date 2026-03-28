@@ -37,7 +37,7 @@ const CHANNEL_CAPACITY: usize = 256;
 /// #     .credentials(Credentials { username: "u".into(), password: "p".into(), api_key: "k".into() })
 /// #     .connect().await?;
 /// let mut stream = client.stream().start().await?;
-/// stream.subscribe_quotes(&["XCME:ES.U25"]).await?;
+/// stream.subscribe_quotes(&["XCME:ES.U26"]).await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -120,7 +120,7 @@ impl<H: HttpTransport> Client<H> {
 /// #     .credentials(Credentials { username: "u".into(), password: "p".into(), api_key: "k".into() })
 /// #     .connect().await?;
 /// let mut stream = client.stream().start().await?;
-/// stream.subscribe_quotes(&["XCME:ES.U25"]).await?;
+/// stream.subscribe_quotes(&["XCME:ES.U26"]).await?;
 ///
 /// while let Some(event) = stream.next().await {
 ///     match event? {
@@ -163,6 +163,33 @@ impl<H: HttpTransport> StreamHandle<H> {
         &self.stream_id
     }
 
+    // -- helpers ------------------------------------------------------------
+
+    async fn sub_market(&self, feed: MarketFeed, symbols: &[&str]) -> Result<()> {
+        subscriptions::subscribe_market(
+            &self.http, &self.base_url, &self.auth_headers, feed, &self.stream_id, symbols,
+        )
+        .await
+    }
+
+    async fn unsub_market(&self, feed: MarketFeed, symbols: &[&str]) -> Result<()> {
+        subscriptions::unsubscribe_market(
+            &self.http, &self.base_url, &self.auth_headers, feed, &self.stream_id, symbols,
+        )
+        .await
+    }
+
+    async fn sub_indicator(
+        &self,
+        kind: BarKind,
+        req: &SubscribeBarsRequest,
+    ) -> Result<IndicatorSubscribeResponse> {
+        subscriptions::subscribe_indicator(
+            &self.http, &self.base_url, &self.auth_headers, kind, &self.stream_id, req,
+        )
+        .await
+    }
+
     // -- Market data subscriptions ------------------------------------------
 
     /// Subscribe to quote updates.
@@ -176,33 +203,17 @@ impl<H: HttpTransport> StreamHandle<H> {
     /// #     .credentials(Credentials { username: "u".into(), password: "p".into(), api_key: "k".into() })
     /// #     .connect().await?;
     /// # let mut stream = client.stream().start().await?;
-    /// stream.subscribe_quotes(&["XCME:ES.U25", "XCME:NQ.U25"]).await?;
+    /// stream.subscribe_quotes(&["XCME:ES.U26", "XCME:NQ.U26"]).await?;
     /// # Ok(())
     /// # }
     /// ```
     pub async fn subscribe_quotes(&self, symbols: &[&str]) -> Result<()> {
-        subscriptions::subscribe_market(
-            &self.http,
-            &self.base_url,
-            &self.auth_headers,
-            MarketFeed::Quotes,
-            &self.stream_id,
-            symbols,
-        )
-        .await
+        self.sub_market(MarketFeed::Quotes, symbols).await
     }
 
     /// Unsubscribe from quote updates.
     pub async fn unsubscribe_quotes(&self, symbols: &[&str]) -> Result<()> {
-        subscriptions::unsubscribe_market(
-            &self.http,
-            &self.base_url,
-            &self.auth_headers,
-            MarketFeed::Quotes,
-            &self.stream_id,
-            symbols,
-        )
-        .await
+        self.unsub_market(MarketFeed::Quotes, symbols).await
     }
 
     /// Subscribe to depth (order book) updates.
@@ -216,33 +227,17 @@ impl<H: HttpTransport> StreamHandle<H> {
     /// #     .credentials(Credentials { username: "u".into(), password: "p".into(), api_key: "k".into() })
     /// #     .connect().await?;
     /// # let mut stream = client.stream().start().await?;
-    /// stream.subscribe_depth(&["XCME:ES.U25"]).await?;
+    /// stream.subscribe_depth(&["XCME:ES.U26"]).await?;
     /// # Ok(())
     /// # }
     /// ```
     pub async fn subscribe_depth(&self, symbols: &[&str]) -> Result<()> {
-        subscriptions::subscribe_market(
-            &self.http,
-            &self.base_url,
-            &self.auth_headers,
-            MarketFeed::Depths,
-            &self.stream_id,
-            symbols,
-        )
-        .await
+        self.sub_market(MarketFeed::Depths, symbols).await
     }
 
     /// Unsubscribe from depth updates.
     pub async fn unsubscribe_depth(&self, symbols: &[&str]) -> Result<()> {
-        subscriptions::unsubscribe_market(
-            &self.http,
-            &self.base_url,
-            &self.auth_headers,
-            MarketFeed::Depths,
-            &self.stream_id,
-            symbols,
-        )
-        .await
+        self.unsub_market(MarketFeed::Depths, symbols).await
     }
 
     /// Subscribe to trade updates.
@@ -256,33 +251,17 @@ impl<H: HttpTransport> StreamHandle<H> {
     /// #     .credentials(Credentials { username: "u".into(), password: "p".into(), api_key: "k".into() })
     /// #     .connect().await?;
     /// # let mut stream = client.stream().start().await?;
-    /// stream.subscribe_trades(&["XCME:ES.U25"]).await?;
+    /// stream.subscribe_trades(&["XCME:ES.U26"]).await?;
     /// # Ok(())
     /// # }
     /// ```
     pub async fn subscribe_trades(&self, symbols: &[&str]) -> Result<()> {
-        subscriptions::subscribe_market(
-            &self.http,
-            &self.base_url,
-            &self.auth_headers,
-            MarketFeed::Trades,
-            &self.stream_id,
-            symbols,
-        )
-        .await
+        self.sub_market(MarketFeed::Trades, symbols).await
     }
 
     /// Unsubscribe from trade updates.
     pub async fn unsubscribe_trades(&self, symbols: &[&str]) -> Result<()> {
-        subscriptions::unsubscribe_market(
-            &self.http,
-            &self.base_url,
-            &self.auth_headers,
-            MarketFeed::Trades,
-            &self.stream_id,
-            symbols,
-        )
-        .await
+        self.unsub_market(MarketFeed::Trades, symbols).await
     }
 
     // -- Indicator subscriptions --------------------------------------------
@@ -301,7 +280,7 @@ impl<H: HttpTransport> StreamHandle<H> {
     /// #     .connect().await?;
     /// # let mut stream = client.stream().start().await?;
     /// let resp = stream.subscribe_trade_bars(&SubscribeBarsRequest {
-    ///     symbol: "XCME:ES.U25".into(),
+    ///     symbol: "XCME:ES.U26".into(),
     ///     period: 1,
     ///     bar_type: BarType::Minute,
     ///     load_size: 100,
@@ -314,15 +293,7 @@ impl<H: HttpTransport> StreamHandle<H> {
         &self,
         req: &SubscribeBarsRequest,
     ) -> Result<IndicatorSubscribeResponse> {
-        subscriptions::subscribe_indicator(
-            &self.http,
-            &self.base_url,
-            &self.auth_headers,
-            BarKind::Trade,
-            &self.stream_id,
-            req,
-        )
-        .await
+        self.sub_indicator(BarKind::Trade, req).await
     }
 
     /// Subscribe to tick bar indicators.
@@ -330,15 +301,7 @@ impl<H: HttpTransport> StreamHandle<H> {
         &self,
         req: &SubscribeBarsRequest,
     ) -> Result<IndicatorSubscribeResponse> {
-        subscriptions::subscribe_indicator(
-            &self.http,
-            &self.base_url,
-            &self.auth_headers,
-            BarKind::Tick,
-            &self.stream_id,
-            req,
-        )
-        .await
+        self.sub_indicator(BarKind::Tick, req).await
     }
 
     /// Subscribe to time bar indicators.
@@ -346,15 +309,7 @@ impl<H: HttpTransport> StreamHandle<H> {
         &self,
         req: &SubscribeBarsRequest,
     ) -> Result<IndicatorSubscribeResponse> {
-        subscriptions::subscribe_indicator(
-            &self.http,
-            &self.base_url,
-            &self.auth_headers,
-            BarKind::Time,
-            &self.stream_id,
-            req,
-        )
-        .await
+        self.sub_indicator(BarKind::Time, req).await
     }
 
     /// Subscribe to volume bar indicators.
@@ -362,15 +317,7 @@ impl<H: HttpTransport> StreamHandle<H> {
         &self,
         req: &SubscribeBarsRequest,
     ) -> Result<IndicatorSubscribeResponse> {
-        subscriptions::subscribe_indicator(
-            &self.http,
-            &self.base_url,
-            &self.auth_headers,
-            BarKind::Volume,
-            &self.stream_id,
-            req,
-        )
-        .await
+        self.sub_indicator(BarKind::Volume, req).await
     }
 
     /// Unsubscribe from an indicator by its identifier.

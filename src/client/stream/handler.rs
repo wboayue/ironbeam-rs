@@ -173,6 +173,46 @@ mod tests {
     }
 
     #[test]
+    fn order_event_rest_field_names() {
+        let json = r#"{"o":[{
+            "orderId":"O2","accountId":"A2","exchSym":"NQ",
+            "status":"NEW","side":"BUY","quantity":2.0,
+            "orderType":"1","duration":"0"
+        }]}"#;
+        let sr: StreamResponse = serde_json::from_str(json).unwrap();
+        let events: Vec<_> = sr.into_events().collect();
+        assert_eq!(events.len(), 1);
+        assert!(matches!(&events[0], StreamEvent::Orders(o) if o[0].order_id == "O2"));
+    }
+
+    #[test]
+    fn balance_event() {
+        let json = r#"{"b":{"a":"ACC1","cc":"USD","cb":10000.0}}"#;
+        let sr: StreamResponse = serde_json::from_str(json).unwrap();
+        let events: Vec<_> = sr.into_events().collect();
+        assert_eq!(events.len(), 1);
+        assert!(matches!(&events[0], StreamEvent::Balance(b) if b.account_id == "ACC1"));
+    }
+
+    #[test]
+    fn fills_event() {
+        let json = r#"{"f":[{"oid":"F1","a":"ACC1","s":"ES","fp":4500.0}]}"#;
+        let sr: StreamResponse = serde_json::from_str(json).unwrap();
+        let events: Vec<_> = sr.into_events().collect();
+        assert_eq!(events.len(), 1);
+        assert!(matches!(&events[0], StreamEvent::Fills(f) if f[0].order_id == "F1"));
+    }
+
+    #[test]
+    fn trade_bars_event() {
+        let json = r#"{"tb":[{"t":1705322400000,"o":4500.0,"h":4510.0,"l":4495.0,"c":4505.0,"v":1000.0,"tc":50}]}"#;
+        let sr: StreamResponse = serde_json::from_str(json).unwrap();
+        let events: Vec<_> = sr.into_events().collect();
+        assert_eq!(events.len(), 1);
+        assert!(matches!(&events[0], StreamEvent::TradeBars(bars) if bars[0].open == Some(4500.0)));
+    }
+
+    #[test]
     fn empty_response() {
         let json = r#"{}"#;
         let sr: StreamResponse = serde_json::from_str(json).unwrap();
