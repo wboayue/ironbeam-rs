@@ -91,6 +91,9 @@ impl<H: HttpTransport> Client<H> {
     }
 }
 
+/// Best-effort logout on drop. The spawned task may not run if the tokio
+/// runtime is shutting down. Prefer calling [`Client::logout()`] explicitly
+/// for guaranteed cleanup.
 impl<H: HttpTransport> Drop for Client<H> {
     fn drop(&mut self) {
         if self.is_logged_out.load(Ordering::Acquire) {
@@ -111,4 +114,44 @@ impl<H: HttpTransport> Drop for Client<H> {
             }
         });
     }
+}
+
+#[cfg(test)]
+pub(crate) mod test_support {
+    use std::sync::atomic::AtomicBool;
+
+    use hyper::header::{AUTHORIZATION, HeaderMap, HeaderValue};
+
+    use super::Client;
+    use super::http::mock::MockHttp;
+
+    /// Build a test client with no auth headers.
+    pub fn test_client(mock: MockHttp) -> Client<MockHttp> {
+        Client {
+            base_url: "http://test".into(),
+            auth_headers: HeaderMap::new(),
+            http: mock,
+            is_logged_out: AtomicBool::new(false),
+        }
+    }
+
+    /// Build a test client with a Bearer auth header.
+    pub fn test_client_with_auth(mock: MockHttp) -> Client<MockHttp> {
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, HeaderValue::from_static("Bearer tok_test"));
+        Client {
+            base_url: "http://test".into(),
+            auth_headers: headers,
+            http: mock,
+            is_logged_out: AtomicBool::new(false),
+        }
+    }
+
+    // Compile-time assertion: Client must be Send + Sync.
+    const _: () = {
+        fn _assert_send_sync<T: Send + Sync>() {}
+        fn _check() {
+            _assert_send_sync::<super::Client>();
+        }
+    };
 }

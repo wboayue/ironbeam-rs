@@ -13,32 +13,19 @@ impl<H: HttpTransport> Client<H> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::AtomicBool;
-
     use hyper::StatusCode;
-    use hyper::header::{AUTHORIZATION, HeaderMap, HeaderValue};
+    use hyper::header::AUTHORIZATION;
 
-    use crate::client::Client;
     use crate::client::http::mock::{MockHttp, MockResponse};
+    use crate::client::test_support::test_client_with_auth;
     use crate::error::Error;
-
-    fn test_client(mock: MockHttp) -> Client<MockHttp> {
-        let mut headers = HeaderMap::new();
-        headers.insert(AUTHORIZATION, HeaderValue::from_static("Bearer tok_test"));
-        Client {
-            base_url: "http://test".into(),
-            auth_headers: headers,
-            http: mock,
-            is_logged_out: AtomicBool::new(false),
-        }
-    }
 
     #[tokio::test]
     async fn all_accounts_returns_list() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"accounts":["ACC1","ACC2"]}"#,
         )]);
-        let client = test_client(mock);
+        let client = test_client_with_auth(mock);
 
         let accounts = client.all_accounts().await.unwrap();
 
@@ -51,7 +38,7 @@ mod tests {
     #[tokio::test]
     async fn all_accounts_sends_auth_header() {
         let mock = MockHttp::new(vec![MockResponse::ok(r#"{"accounts":[]}"#)]);
-        let client = test_client(mock);
+        let client = test_client_with_auth(mock);
 
         client.all_accounts().await.unwrap();
 
@@ -65,7 +52,7 @@ mod tests {
             StatusCode::NOT_FOUND,
             r#"{"error1":"Not Found"}"#,
         )]);
-        let client = test_client(mock);
+        let client = test_client_with_auth(mock);
 
         let err = client.all_accounts().await.unwrap_err();
 
@@ -81,7 +68,7 @@ mod tests {
     #[tokio::test]
     async fn get_maps_malformed_json() {
         let mock = MockHttp::new(vec![MockResponse::ok(b"not json".to_vec())]);
-        let client = test_client(mock);
+        let client = test_client_with_auth(mock);
 
         let err = client.all_accounts().await.unwrap_err();
         assert!(matches!(err, Error::Json(_)));

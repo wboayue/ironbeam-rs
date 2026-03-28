@@ -85,6 +85,7 @@ mod tests {
 
     use crate::client::Client;
     use crate::client::http::mock::{MockHttp, MockResponse};
+    use crate::client::test_support::test_client;
     use crate::error::Error;
 
     use crate::client::config::Credentials;
@@ -96,15 +97,6 @@ mod tests {
             username: "user".into(),
             password: "pass".into(),
             api_key: "key123".into(),
-        }
-    }
-
-    fn test_client(mock: MockHttp) -> Client<MockHttp> {
-        Client {
-            base_url: "http://test".into(),
-            auth_headers: HeaderMap::new(),
-            http: mock,
-            is_logged_out: AtomicBool::new(false),
         }
     }
 
