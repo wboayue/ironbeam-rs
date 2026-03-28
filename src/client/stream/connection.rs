@@ -172,7 +172,8 @@ fn build_ws_url(base_url: &str, stream_id: &str, token: &str) -> Result<String> 
     let ws_base = base_url
         .replacen("https://", "wss://", 1)
         .replacen("http://", "ws://", 1);
-    Ok(format!("{ws_base}/stream/{stream_id}?token={token}"))
+    let encoded_token = urlencoding::encode(token);
+    Ok(format!("{ws_base}/stream/{stream_id}?token={encoded_token}"))
 }
 
 async fn connect_tls(

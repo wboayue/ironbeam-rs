@@ -2,8 +2,6 @@ mod connection;
 pub(crate) mod handler;
 mod subscriptions;
 
-use std::marker::PhantomData;
-
 use hyper::header::{AUTHORIZATION, HeaderMap};
 use tokio::sync::{mpsc, watch};
 use tokio::task::JoinHandle;
@@ -43,7 +41,6 @@ const CHANNEL_CAPACITY: usize = 256;
 /// ```
 pub struct StreamBuilder<'a, H: HttpTransport> {
     client: &'a Client<H>,
-    _marker: PhantomData<H>,
 }
 
 impl<'a, H: HttpTransport> StreamBuilder<'a, H> {
@@ -94,10 +91,7 @@ impl<H: HttpTransport> Client<H> {
     /// ```
     #[must_use]
     pub fn stream(&self) -> StreamBuilder<'_, H> {
-        StreamBuilder {
-            client: self,
-            _marker: PhantomData,
-        }
+        StreamBuilder { client: self }
     }
 }
 

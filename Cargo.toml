@@ -19,4 +19,5 @@ bytes = "1"
 http-body-util = "0.1"
 fastwebsockets = { version = "0.8", features = ["upgrade"] }
 tokio-rustls = "0.26"
+urlencoding = "2"
 webpki-roots = "0.26"
