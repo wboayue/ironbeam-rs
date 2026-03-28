@@ -41,18 +41,23 @@ impl BarKind {
     }
 }
 
-/// `GET /market/{feed}/subscribe/{streamId}?symbols=SYM1,SYM2`
-pub(crate) async fn subscribe_market<H: HttpTransport>(
+/// `GET /market/{feed}/{action}/{streamId}?symbols=SYM1,SYM2`
+async fn market_request<H: HttpTransport>(
     http: &H,
     base_url: &str,
     headers: &HeaderMap,
     feed: MarketFeed,
+    action: &str,
     stream_id: &str,
     symbols: &[&str],
 ) -> Result<()> {
-    let symbols_param = symbols.join(",");
+    let symbols_param: String = symbols
+        .iter()
+        .map(|s| urlencoding::encode(s))
+        .collect::<Vec<_>>()
+        .join(",");
     let path = format!(
-        "{base_url}/market/{}/subscribe/{stream_id}?symbols={symbols_param}",
+        "{base_url}/market/{}/{action}/{stream_id}?symbols={symbols_param}",
         feed.as_str()
     );
     let uri = path.parse()?;
@@ -76,6 +81,18 @@ pub(crate) async fn subscribe_market<H: HttpTransport>(
     Ok(())
 }
 
+/// `GET /market/{feed}/subscribe/{streamId}?symbols=SYM1,SYM2`
+pub(crate) async fn subscribe_market<H: HttpTransport>(
+    http: &H,
+    base_url: &str,
+    headers: &HeaderMap,
+    feed: MarketFeed,
+    stream_id: &str,
+    symbols: &[&str],
+) -> Result<()> {
+    market_request(http, base_url, headers, feed, "subscribe", stream_id, symbols).await
+}
+
 /// `GET /market/{feed}/unsubscribe/{streamId}?symbols=SYM1,SYM2`
 pub(crate) async fn unsubscribe_market<H: HttpTransport>(
     http: &H,
@@ -85,30 +102,7 @@ pub(crate) async fn unsubscribe_market<H: HttpTransport>(
     stream_id: &str,
     symbols: &[&str],
 ) -> Result<()> {
-    let symbols_param = symbols.join(",");
-    let path = format!(
-        "{base_url}/market/{}/unsubscribe/{stream_id}?symbols={symbols_param}",
-        feed.as_str()
-    );
-    let uri = path.parse()?;
-    let (status, body) = http.get(uri, headers).await?;
-
-    if !status.is_success() {
-        return Err(Error::Api {
-            status: status.as_u16(),
-            message: parse_api_error(&body),
-        });
-    }
-
-    let resp: SuccessResponse = serde_json::from_slice(&body)?;
-    if resp.status != crate::types::ResponseStatus::Ok {
-        return Err(Error::Api {
-            status: status.as_u16(),
-            message: resp.message.unwrap_or_default(),
-        });
-    }
-
-    Ok(())
+    market_request(http, base_url, headers, feed, "unsubscribe", stream_id, symbols).await
 }
 
 /// `POST /indicator/{streamId}/{barKind}/subscribe`
@@ -193,7 +187,7 @@ mod tests {
         assert_eq!(reqs[0].method, "GET");
         assert_eq!(
             reqs[0].uri.to_string(),
-            "http://test/market/quotes/subscribe/stream-123?symbols=XCME:ES.U25,XCME:NQ.U25"
+            "http://test/market/quotes/subscribe/stream-123?symbols=XCME%3AES.U25,XCME%3ANQ.U25"
         );
         assert_eq!(
             reqs[0].headers.get(AUTHORIZATION).unwrap(),
