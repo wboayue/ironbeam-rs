@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
+use time::OffsetDateTime;
 
-use super::Symbol;
+use super::{Symbol, option_timestamp_ms};
 
 /// Trader information.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -152,8 +153,8 @@ pub struct OptionGroupInfo {
     pub group: Option<String>,
 
     /// Expiration timestamp.
-    #[serde(default)]
-    pub expiration: Option<i64>,
+    #[serde(default, with = "option_timestamp_ms")]
+    pub expiration: Option<OffsetDateTime>,
 
     /// Description.
     #[serde(default)]

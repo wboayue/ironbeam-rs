@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
-use time::OffsetDateTime;
+use time::{Date, OffsetDateTime};
 
 use super::{
     AggressorSideType, BlockTrade, InvestigationStatus, Symbol, SystemPricedTrade, TickDirection,
-    TickDirectionType, option_timestamp_ms,
+    TickDirectionType, option_date_yyyymmdd, option_timestamp_ms,
 };
 
 /// Full market quote. Used in both REST and streaming.
@@ -49,9 +49,9 @@ pub struct QuoteFull {
     #[serde(rename = "stt", default)]
     pub settlement_price: Option<f64>,
 
-    /// Settlement trade date (YYYYMMDD).
-    #[serde(rename = "stts", default)]
-    pub settlement_date: Option<String>,
+    /// Settlement trade date.
+    #[serde(rename = "stts", default, with = "option_date_yyyymmdd")]
+    pub settlement_date: Option<Date>,
 
     /// Settlement send time.
     #[serde(rename = "sttst", default, with = "option_timestamp_ms")]
@@ -61,9 +61,9 @@ pub struct QuoteFull {
     #[serde(rename = "pstt", default)]
     pub prev_settlement_price: Option<f64>,
 
-    /// Previous settlement trade date (YYYYMMDD).
-    #[serde(rename = "pstts", default)]
-    pub prev_settlement_date: Option<String>,
+    /// Previous settlement trade date.
+    #[serde(rename = "pstts", default, with = "option_date_yyyymmdd")]
+    pub prev_settlement_date: Option<Date>,
 
     /// Settlement change.
     #[serde(rename = "sttch", default)]
@@ -121,17 +121,17 @@ pub struct QuoteFull {
     #[serde(rename = "tt", default, with = "option_timestamp_ms")]
     pub trade_time: Option<OffsetDateTime>,
 
-    /// Trade date (YYYYMMDD).
-    #[serde(rename = "tdt", default)]
-    pub trade_date: Option<String>,
+    /// Trade date.
+    #[serde(rename = "tdt", default, with = "option_date_yyyymmdd")]
+    pub trade_date: Option<Date>,
 
     /// Security status.
     #[serde(rename = "secs", default)]
     pub security_status: Option<i32>,
 
-    /// Session date (YYYYMMDD).
-    #[serde(rename = "sdt", default)]
-    pub session_date: Option<String>,
+    /// Session date.
+    #[serde(rename = "sdt", default, with = "option_date_yyyymmdd")]
+    pub session_date: Option<Date>,
 
     /// Open interest.
     #[serde(rename = "oi", default)]
@@ -239,9 +239,9 @@ pub struct Trade {
     #[serde(rename = "aggressorSide", default)]
     pub aggressor_side: Option<AggressorSideType>,
 
-    /// Trade date (YYYYMMDD).
-    #[serde(rename = "tradeDate", default)]
-    pub trade_date: Option<String>,
+    /// Trade date.
+    #[serde(rename = "tradeDate", default, with = "option_date_yyyymmdd")]
+    pub trade_date: Option<Date>,
 
     /// Trade identifier.
     #[serde(rename = "tradeId", default)]
@@ -290,9 +290,9 @@ pub struct TradeOpt {
     #[serde(rename = "as", default)]
     pub aggressor_side: Option<AggressorSideType>,
 
-    /// Trade date (YYYYMMDD).
-    #[serde(rename = "tdt", default)]
-    pub trade_date: Option<String>,
+    /// Trade date.
+    #[serde(rename = "tdt", default, with = "option_date_yyyymmdd")]
+    pub trade_date: Option<Date>,
 
     /// Trade identifier.
     #[serde(rename = "tid", default)]

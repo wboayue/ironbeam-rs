@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
+use time::OffsetDateTime;
 
 use super::common::OrderError;
-use super::{DurationType, OrderSide, OrderStatusType, OrderType, Symbol};
+use super::{DurationType, OrderSide, OrderStatusType, OrderType, Symbol, option_datetime_rfc3339, option_timestamp_ms};
 
 /// Order. Unified across REST and streaming.
 ///
@@ -64,9 +65,9 @@ pub struct Order {
     #[serde(rename = "fillPrice", alias = "fp", default)]
     pub fill_price: Option<f64>,
 
-    /// Fill date (ISO 8601).
-    #[serde(rename = "fillDate", alias = "fd", default)]
-    pub fill_date: Option<String>,
+    /// Fill date.
+    #[serde(rename = "fillDate", alias = "fd", default, with = "option_datetime_rfc3339")]
+    pub fill_date: Option<OffsetDateTime>,
 
     /// Child order IDs (stop loss / take profit).
     #[serde(rename = "childOrders", alias = "cor", default)]
@@ -128,13 +129,13 @@ pub struct OrderFill {
     #[serde(rename = "avgFillPrice", alias = "afp", default)]
     pub avg_fill_price: Option<f64>,
 
-    /// Fill date (ISO 8601).
-    #[serde(rename = "fillDate", alias = "fd", default)]
-    pub fill_date: Option<String>,
+    /// Fill date.
+    #[serde(rename = "fillDate", alias = "fd", default, with = "option_datetime_rfc3339")]
+    pub fill_date: Option<OffsetDateTime>,
 
-    /// Time of order event (ms since epoch).
-    #[serde(rename = "timeOrderEvent", alias = "t", default)]
-    pub time_order_event: Option<i64>,
+    /// Time of order event.
+    #[serde(rename = "timeOrderEvent", alias = "t", default, with = "option_timestamp_ms")]
+    pub time_order_event: Option<OffsetDateTime>,
 
     /// Order update identifier.
     #[serde(rename = "orderUpdateId", alias = "ouid", default)]

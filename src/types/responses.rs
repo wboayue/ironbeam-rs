@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use time::OffsetDateTime;
 
 use super::account::AccountPositions;
 use super::common::Response;
@@ -7,7 +8,7 @@ use super::order::Order;
 use super::{
     Balance, ComplexGroupInfo, ComplexGroups, FutureInfo, OptionGroupInfo, OrderFill, Position,
     RiskInfo, SecurityDefinition, SecurityMarginAndValue, SecurityStatus, Spread, Symbol,
-    SymbolInfo, TraderInfo, UserInfo,
+    SymbolInfo, TraderInfo, UserInfo, option_timestamp_ms,
 };
 
 /// Authentication response.
@@ -233,10 +234,10 @@ pub struct SimulatedTraderAddAccountResponse {
 pub struct CashReportEntry {
     #[serde(default)]
     pub amount: Option<f64>,
-    #[serde(rename = "entryDate", default)]
-    pub entry_date: Option<i64>,
-    #[serde(rename = "availableDate", default)]
-    pub available_date: Option<i64>,
+    #[serde(rename = "entryDate", default, with = "option_timestamp_ms")]
+    pub entry_date: Option<OffsetDateTime>,
+    #[serde(rename = "availableDate", default, with = "option_timestamp_ms")]
+    pub available_date: Option<OffsetDateTime>,
 }
 
 /// Simulated account cash report response.
