@@ -79,7 +79,9 @@ impl ClientBuilder {
             .credentials
             .ok_or_else(|| Error::Auth("credentials not set".into()))?;
 
-        let _ = rustls::crypto::ring::default_provider().install_default();
+        if rustls::crypto::ring::default_provider().install_default().is_err() {
+            tracing::debug!("rustls CryptoProvider already installed, using existing");
+        }
         let http = HttpClient::new();
         let token = auth::authenticate(&http, &self.base_url, &credentials).await?;
 

@@ -48,7 +48,7 @@ pub async fn authenticate(
 /// Invalidate the bearer token.
 pub async fn logout(http: &impl HttpTransport, base_url: &str, headers: &HeaderMap) -> Result<()> {
     let uri = format!("{base_url}/logout").parse()?;
-    let (status, resp_bytes) = http.post(uri, Bytes::new(), headers).await?;
+    let (status, resp_bytes) = http.post(uri, Bytes::from_static(b"{}"), headers).await?;
 
     if !status.is_success() {
         return Err(Error::Api {

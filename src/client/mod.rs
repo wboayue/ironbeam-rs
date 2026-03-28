@@ -39,9 +39,20 @@ use http::HttpClient;
 /// ```
 pub struct Client<H: HttpTransport = HttpClient> {
     pub(crate) base_url: String,
+    /// Cached authorization headers. Contains the bearer token — do not log.
     pub(crate) auth_headers: HeaderMap,
     pub(crate) http: H,
     pub(crate) is_logged_out: AtomicBool,
+}
+
+impl<H: HttpTransport> std::fmt::Debug for Client<H> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Client")
+            .field("base_url", &self.base_url)
+            .field("auth_headers", &"[redacted]")
+            .field("is_logged_out", &self.is_logged_out)
+            .finish()
+    }
 }
 
 impl Client {
