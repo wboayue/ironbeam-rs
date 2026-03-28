@@ -161,6 +161,15 @@ pub struct OptionGroupInfo {
     pub description: Option<String>,
 }
 
+/// Domain result for option groups query. Separates transport (serde) from public API.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SymbolOptionsResult {
+    /// Group names.
+    pub groups: Vec<String>,
+    /// Option group details.
+    pub option_groups: Vec<OptionGroupInfo>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

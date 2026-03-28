@@ -5,6 +5,7 @@ pub mod stream;
 
 pub use config::{ClientBuilder, Credentials};
 pub use http::HttpTransport;
+pub use rest::SymbolSearchParams;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
