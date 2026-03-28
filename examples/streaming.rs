@@ -34,7 +34,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         match event? {
             StreamEvent::Quotes(quotes) => {
                 for q in &quotes {
-                    println!("Quote {}: last={:?} bid={:?} ask={:?}", q.s, q.l, q.b, q.a);
+                    println!("Quote {}: last={:?} bid={:?} ask={:?}", q.symbol, q.last_price, q.bid, q.ask);
                 }
                 count += 1;
                 if count >= 5 {

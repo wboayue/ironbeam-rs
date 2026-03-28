@@ -54,59 +54,59 @@ impl StreamResponse {
     pub(crate) fn into_events(self) -> impl Iterator<Item = StreamEvent> {
         let mut events = Vec::new();
 
-        if let Some(p) = self.p {
-            events.push(StreamEvent::Ping(p));
+        if let Some(v) = self.ping {
+            events.push(StreamEvent::Ping(v));
         }
-        if let Some(q) = self.q {
-            events.push(StreamEvent::Quotes(q));
+        if let Some(v) = self.quotes {
+            events.push(StreamEvent::Quotes(v));
         }
-        if let Some(d) = self.d {
-            events.push(StreamEvent::Depth(d));
+        if let Some(v) = self.depths {
+            events.push(StreamEvent::Depth(v));
         }
-        if let Some(tr) = self.tr {
-            events.push(StreamEvent::Trades(tr));
+        if let Some(v) = self.trades {
+            events.push(StreamEvent::Trades(v));
         }
-        if let Some(o) = self.o {
-            events.push(StreamEvent::Orders(o));
+        if let Some(v) = self.orders {
+            events.push(StreamEvent::Orders(v));
         }
-        if let Some(f) = self.f {
-            events.push(StreamEvent::Fills(f));
+        if let Some(v) = self.fills {
+            events.push(StreamEvent::Fills(v));
         }
-        if let Some(ps) = self.ps {
-            events.push(StreamEvent::Positions(ps));
+        if let Some(v) = self.positions {
+            events.push(StreamEvent::Positions(v));
         }
-        if let Some(psa) = self.psa {
-            events.push(StreamEvent::AllPositions(psa));
+        if let Some(v) = self.all_positions {
+            events.push(StreamEvent::AllPositions(v));
         }
-        if let Some(b) = self.b {
-            events.push(StreamEvent::Balance(Box::new(b)));
+        if let Some(v) = self.balance {
+            events.push(StreamEvent::Balance(Box::new(v)));
         }
-        if let Some(ba) = self.ba {
-            events.push(StreamEvent::AllBalances(ba));
+        if let Some(v) = self.all_balances {
+            events.push(StreamEvent::AllBalances(v));
         }
-        if let Some(ri) = self.ri {
-            events.push(StreamEvent::Risk(ri));
+        if let Some(v) = self.risk {
+            events.push(StreamEvent::Risk(v));
         }
-        if let Some(ria) = self.ria {
-            events.push(StreamEvent::AllRisk(ria));
+        if let Some(v) = self.all_risk {
+            events.push(StreamEvent::AllRisk(v));
         }
-        if let Some(tb) = self.tb {
-            events.push(StreamEvent::TradeBars(tb));
+        if let Some(v) = self.trade_bars {
+            events.push(StreamEvent::TradeBars(v));
         }
-        if let Some(tc) = self.tc {
-            events.push(StreamEvent::TickBars(tc));
+        if let Some(v) = self.tick_bars {
+            events.push(StreamEvent::TickBars(v));
         }
-        if let Some(ti) = self.ti {
-            events.push(StreamEvent::TimeBars(ti));
+        if let Some(v) = self.time_bars {
+            events.push(StreamEvent::TimeBars(v));
         }
-        if let Some(vb) = self.vb {
-            events.push(StreamEvent::VolumeBars(vb));
+        if let Some(v) = self.volume_bars {
+            events.push(StreamEvent::VolumeBars(v));
         }
-        if let Some(i) = self.i {
-            events.push(StreamEvent::Indicators(i));
+        if let Some(v) = self.indicators {
+            events.push(StreamEvent::Indicators(v));
         }
-        if let Some(r) = self.r {
-            events.push(StreamEvent::Notification(r));
+        if let Some(v) = self.notification {
+            events.push(StreamEvent::Notification(v));
         }
 
         events.into_iter()
@@ -132,7 +132,7 @@ mod tests {
         let sr: StreamResponse = serde_json::from_str(json).unwrap();
         let events: Vec<_> = sr.into_events().collect();
         assert_eq!(events.len(), 1);
-        assert!(matches!(&events[0], StreamEvent::Quotes(q) if q[0].s == "XCME:ES.U25"));
+        assert!(matches!(&events[0], StreamEvent::Quotes(q) if q[0].symbol == "XCME:ES.U25"));
     }
 
     #[test]
