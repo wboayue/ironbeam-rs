@@ -14,11 +14,52 @@ pub enum ResponseStatus {
 }
 
 /// Account balance type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// REST sends string values (`"CURRENT_OPEN"`), streaming sends integers (`0`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum BalanceType {
     CurrentOpen,
     StartOfDay,
+}
+
+impl<'de> Deserialize<'de> for BalanceType {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct BalanceTypeVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for BalanceTypeVisitor {
+            type Value = BalanceType;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a string or integer balance type")
+            }
+
+            fn visit_u64<E: serde::de::Error>(self, v: u64) -> std::result::Result<BalanceType, E> {
+                match v {
+                    0 => Ok(BalanceType::CurrentOpen),
+                    1 => Ok(BalanceType::StartOfDay),
+                    _ => Err(E::custom(format!("unknown balance type integer: {v}"))),
+                }
+            }
+
+            fn visit_i64<E: serde::de::Error>(self, v: i64) -> std::result::Result<BalanceType, E> {
+                self.visit_u64(v as u64)
+            }
+
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> std::result::Result<BalanceType, E> {
+                match v {
+                    "CURRENT_OPEN" => Ok(BalanceType::CurrentOpen),
+                    "START_OF_DAY" => Ok(BalanceType::StartOfDay),
+                    _ => Err(E::custom(format!("unknown balance type string: {v}"))),
+                }
+            }
+        }
+
+        deserializer.deserialize_any(BalanceTypeVisitor)
+    }
 }
 
 /// Order side.
@@ -145,7 +186,9 @@ pub enum SideShort {
 }
 
 /// Regulatory code type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// REST sends string values (`"COMBINED"`), streaming sends integers (`1`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum RegCodeType {
     Invalid,
@@ -153,6 +196,51 @@ pub enum RegCodeType {
     Regulated,
     NonSecured,
     Secured,
+}
+
+impl<'de> Deserialize<'de> for RegCodeType {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct RegCodeVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for RegCodeVisitor {
+            type Value = RegCodeType;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a string or integer regulatory code")
+            }
+
+            fn visit_u64<E: serde::de::Error>(self, v: u64) -> std::result::Result<RegCodeType, E> {
+                match v {
+                    0 => Ok(RegCodeType::Invalid),
+                    1 => Ok(RegCodeType::Combined),
+                    2 => Ok(RegCodeType::Regulated),
+                    3 => Ok(RegCodeType::NonSecured),
+                    4 => Ok(RegCodeType::Secured),
+                    _ => Err(E::custom(format!("unknown reg code integer: {v}"))),
+                }
+            }
+
+            fn visit_i64<E: serde::de::Error>(self, v: i64) -> std::result::Result<RegCodeType, E> {
+                self.visit_u64(v as u64)
+            }
+
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> std::result::Result<RegCodeType, E> {
+                match v {
+                    "INVALID" => Ok(RegCodeType::Invalid),
+                    "COMBINED" => Ok(RegCodeType::Combined),
+                    "REGULATED" => Ok(RegCodeType::Regulated),
+                    "NON_SECURED" => Ok(RegCodeType::NonSecured),
+                    "SECURED" => Ok(RegCodeType::Secured),
+                    _ => Err(E::custom(format!("unknown reg code string: {v}"))),
+                }
+            }
+        }
+
+        deserializer.deserialize_any(RegCodeVisitor)
+    }
 }
 
 /// Tick direction (string enum).
