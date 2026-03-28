@@ -34,6 +34,7 @@ pub(crate) enum WsMessage {
 /// Production WebSocket transport using fastwebsockets.
 pub(crate) struct FastWs {
     inner: FragmentCollector<TokioIo<Upgraded>>,
+    stream_id: String,
 }
 
 impl WsTransport for FastWs {
@@ -59,7 +60,7 @@ impl WsTransport for FastWs {
                     return Ok(WsMessage::Close(reason));
                 }
                 other => {
-                    tracing::debug!(?other, "ignoring unexpected WebSocket opcode");
+                    tracing::debug!(stream_id = %self.stream_id, ?other, "ignoring unexpected WebSocket opcode");
                 }
             }
         }
@@ -121,6 +122,7 @@ pub(crate) async fn connect(base_url: &str, stream_id: &str, token: &str) -> Res
 
     Ok(FastWs {
         inner: FragmentCollector::new(ws),
+        stream_id: stream_id.to_owned(),
     })
 }
 

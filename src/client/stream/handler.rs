@@ -149,6 +149,22 @@ mod tests {
     }
 
     #[test]
+    fn order_event_mixed_alias_fields() {
+        // Real API can mix short streaming names and long REST names in a single payload.
+        let json = r#"{"o":[{
+            "orderId":"O3","a":"A3","exchSym":"ES",
+            "st":"NEW","side":"SELL","q":3.0,
+            "orderType":"2","dr":"1"
+        }]}"#;
+        let sr: StreamResponse = serde_json::from_str(json).unwrap();
+        let events: Vec<_> = sr.into_events().collect();
+        assert_eq!(events.len(), 1);
+        assert!(
+            matches!(&events[0], StreamEvent::Orders(o) if o[0].order_id == "O3" && o[0].account_id == "A3")
+        );
+    }
+
+    #[test]
     fn balance_event() {
         let json = r#"{"b":{"a":"ACC1","cc":"USD","cb":10000.0}}"#;
         let sr: StreamResponse = serde_json::from_str(json).unwrap();

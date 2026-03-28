@@ -67,7 +67,15 @@ impl<'a, H: HttpTransport> StreamBuilder<'a, H> {
         let token = extract_token(&self.client.auth_headers)?;
 
         // 3. Open WebSocket connection.
-        let ws = connection::connect(&self.client.base_url, &stream_id, &token).await?;
+        let ws = match connection::connect(&self.client.base_url, &stream_id, &token).await {
+            Ok(ws) => ws,
+            Err(e) => {
+                // Stream session created on server but WebSocket failed.
+                // No destroy endpoint exists — session will expire server-side.
+                tracing::warn!(stream_id = %stream_id, error = %e, "websocket connect failed after stream session created");
+                return Err(e);
+            }
+        };
         tracing::info!(stream_id = %stream_id, "websocket connected");
 
         // 4. Spawn message loop.
