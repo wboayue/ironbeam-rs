@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 use time::{Date, OffsetDateTime};
 
-use super::{BalanceType, PositionSide, RegCodeType, Symbol, option_date_yyyymmdd, option_timestamp_ms};
+use super::{
+    BalanceType, PositionSide, RegCodeType, Symbol, option_date_yyyymmdd, option_timestamp_ms,
+};
 
 /// Account balance. Unified across REST and streaming.
 ///
@@ -113,7 +115,12 @@ pub struct MarginDetail {
     pub is_estimated: Option<bool>,
 
     /// Timestamp of margin calculation.
-    #[serde(rename = "asOfTime", alias = "t", default, with = "option_timestamp_ms")]
+    #[serde(
+        rename = "asOfTime",
+        alias = "t",
+        default,
+        with = "option_timestamp_ms"
+    )]
     pub as_of_time: Option<OffsetDateTime>,
 }
 
@@ -145,7 +152,12 @@ pub struct Position {
     pub price: Option<f64>,
 
     /// Date position was opened.
-    #[serde(rename = "dateOpened", alias = "do", default, with = "option_date_yyyymmdd")]
+    #[serde(
+        rename = "dateOpened",
+        alias = "do",
+        default,
+        with = "option_date_yyyymmdd"
+    )]
     pub date_opened: Option<Date>,
 
     /// Position side (LONG or SHORT).

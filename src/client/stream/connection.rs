@@ -16,13 +16,9 @@ use super::handler::StreamEvent;
 
 /// Abstraction over WebSocket frames for testability.
 pub(crate) trait WsTransport: Send + 'static {
-    fn read_frame(
-        &mut self,
-    ) -> impl std::future::Future<Output = Result<WsMessage>> + Send;
+    fn read_frame(&mut self) -> impl std::future::Future<Output = Result<WsMessage>> + Send;
 
-    fn write_close(
-        &mut self,
-    ) -> impl std::future::Future<Output = Result<()>> + Send;
+    fn write_close(&mut self) -> impl std::future::Future<Output = Result<()>> + Send;
 }
 
 /// Parsed WebSocket message.
@@ -49,9 +45,7 @@ impl WsTransport for FastWs {
 
             match frame.opcode {
                 OpCode::Text => return Ok(WsMessage::Text(payload_to_bytes(frame.payload))),
-                OpCode::Binary => {
-                    return Ok(WsMessage::Binary(payload_to_bytes(frame.payload)))
-                }
+                OpCode::Binary => return Ok(WsMessage::Binary(payload_to_bytes(frame.payload))),
                 OpCode::Close => {
                     let reason = if frame.payload.len() > 2 {
                         String::from_utf8(frame.payload[2..].to_vec()).ok()
@@ -103,8 +97,14 @@ pub(crate) async fn connect(base_url: &str, stream_id: &str, token: &str) -> Res
     let ws_url = build_ws_url(base_url, stream_id, token)?;
     let uri: Uri = ws_url.parse()?;
 
-    let host = uri.host().ok_or_else(|| Error::WebSocket("missing host".into()))?;
-    let default_port = if uri.scheme_str() == Some("ws") { 80 } else { 443 };
+    let host = uri
+        .host()
+        .ok_or_else(|| Error::WebSocket("missing host".into()))?;
+    let default_port = if uri.scheme_str() == Some("ws") {
+        80
+    } else {
+        443
+    };
     let port = uri.port_u16().unwrap_or(default_port);
     let addr = format!("{host}:{port}");
 
@@ -198,7 +198,9 @@ fn build_ws_url(base_url: &str, stream_id: &str, token: &str) -> Result<String> 
         .replacen("https://", "wss://", 1)
         .replacen("http://", "ws://", 1);
     let encoded_token = urlencoding::encode(token);
-    Ok(format!("{ws_base}/stream/{stream_id}?token={encoded_token}"))
+    Ok(format!(
+        "{ws_base}/stream/{stream_id}?token={encoded_token}"
+    ))
 }
 
 async fn connect_tls(
@@ -280,7 +282,10 @@ mod tests {
     #[test]
     fn build_ws_url_from_https() {
         let url = build_ws_url("https://demo.ironbeamapi.com/v2", "abc-123", "tok").unwrap();
-        assert_eq!(url, "wss://demo.ironbeamapi.com/v2/stream/abc-123?token=tok");
+        assert_eq!(
+            url,
+            "wss://demo.ironbeamapi.com/v2/stream/abc-123?token=tok"
+        );
     }
 
     #[test]
@@ -313,10 +318,7 @@ mod tests {
 
     #[tokio::test]
     async fn message_loop_handles_bad_json() {
-        let ws = MockWsTransport::from_json(&[
-            "not valid json",
-            r#"{"p":{"ping":"ok"}}"#,
-        ]);
+        let ws = MockWsTransport::from_json(&["not valid json", r#"{"p":{"ping":"ok"}}"#]);
         let (tx, mut rx) = mpsc::channel(16);
         let (_shutdown_tx, shutdown_rx) = watch::channel(false);
 

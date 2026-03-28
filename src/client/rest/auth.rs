@@ -2,7 +2,7 @@ use std::sync::atomic::Ordering;
 
 use bytes::Bytes;
 use hyper::Method;
-use hyper::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
+use hyper::header::{CONTENT_TYPE, HeaderMap, HeaderValue};
 
 use crate::client::Client;
 use crate::client::config::Credentials;
@@ -44,7 +44,8 @@ pub async fn authenticate(
         ));
     }
 
-    let token = resp.token
+    let token = resp
+        .token
         .ok_or_else(|| Error::Auth("no token in response".into()))?;
 
     tracing::info!("authenticated successfully");
@@ -196,9 +197,7 @@ mod tests {
 
     #[tokio::test]
     async fn authenticate_sends_credentials_in_body() {
-        let mock = MockHttp::new(vec![MockResponse::ok(
-            r#"{"status":"OK","token":"t"}"#,
-        )]);
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"status":"OK","token":"t"}"#)]);
 
         authenticate(&mock, "http://test", &test_credentials())
             .await

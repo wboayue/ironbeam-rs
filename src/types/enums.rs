@@ -23,13 +23,15 @@ impl<'de, T: Copy> serde::de::Visitor<'de> for DualFormatVisitor<T> {
                 return Ok(val);
             }
         }
-        Err(E::custom(format!("unknown {} integer: {}", self.type_name, v)))
+        Err(E::custom(format!(
+            "unknown {} integer: {}",
+            self.type_name, v
+        )))
     }
 
     fn visit_i64<E: serde::de::Error>(self, v: i64) -> std::result::Result<T, E> {
-        let v = u64::try_from(v).map_err(|_| {
-            E::custom(format!("negative {}: {}", self.type_name, v))
-        })?;
+        let v = u64::try_from(v)
+            .map_err(|_| E::custom(format!("negative {}: {}", self.type_name, v)))?;
         self.visit_u64(v)
     }
 
@@ -39,7 +41,10 @@ impl<'de, T: Copy> serde::de::Visitor<'de> for DualFormatVisitor<T> {
                 return Ok(val);
             }
         }
-        Err(E::custom(format!("unknown {} string: {}", self.type_name, v)))
+        Err(E::custom(format!(
+            "unknown {} string: {}",
+            self.type_name, v
+        )))
     }
 }
 
@@ -624,8 +629,14 @@ mod tests {
 
     #[test]
     fn depth_side_from_integer() {
-        assert_eq!(serde_json::from_str::<DepthSide>("0").unwrap(), DepthSide::Bid);
-        assert_eq!(serde_json::from_str::<DepthSide>("1").unwrap(), DepthSide::Ask);
+        assert_eq!(
+            serde_json::from_str::<DepthSide>("0").unwrap(),
+            DepthSide::Bid
+        );
+        assert_eq!(
+            serde_json::from_str::<DepthSide>("1").unwrap(),
+            DepthSide::Ask
+        );
     }
 
     #[test]

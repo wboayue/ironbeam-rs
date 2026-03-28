@@ -3,8 +3,8 @@ use std::error::Error;
 
 use ironbeam_rs::client::stream::StreamEvent;
 use ironbeam_rs::client::{Client, Credentials};
-use ironbeam_rs::types::streaming::SubscribeBarsRequest;
 use ironbeam_rs::types::BarType;
+use ironbeam_rs::types::streaming::SubscribeBarsRequest;
 
 /// Stream real-time indicator (bar) data from the Ironbeam API.
 ///
@@ -17,7 +17,9 @@ use ironbeam_rs::types::BarType;
 /// Defaults to `trade` if no argument is given.
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    tracing_subscriber::fmt().with_max_level(tracing::Level::DEBUG).init();
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::DEBUG)
+        .init();
 
     let bar_kind = env::args().nth(1).unwrap_or_else(|| "trade".into());
 
@@ -54,28 +56,43 @@ async fn main() -> Result<(), Box<dyn Error>> {
             std::process::exit(1);
         }
     };
-    println!("Subscribed to {bar_kind} bars: id={} names={:?}", resp.indicator_id, resp.value_names);
+    println!(
+        "Subscribed to {bar_kind} bars: id={} names={:?}",
+        resp.indicator_id, resp.value_names
+    );
 
     while let Some(event) = stream.next().await {
         match event? {
             StreamEvent::TradeBars(bars) => {
                 for b in &bars {
-                    println!("TradeBar: o={:?} h={:?} l={:?} c={:?} v={:?}", b.open, b.high, b.low, b.close, b.volume);
+                    println!(
+                        "TradeBar: o={:?} h={:?} l={:?} c={:?} v={:?}",
+                        b.open, b.high, b.low, b.close, b.volume
+                    );
                 }
             }
             StreamEvent::TickBars(bars) => {
                 for b in &bars {
-                    println!("TickBar: o={:?} h={:?} l={:?} c={:?} v={:?}", b.open, b.high, b.low, b.close, b.volume);
+                    println!(
+                        "TickBar: o={:?} h={:?} l={:?} c={:?} v={:?}",
+                        b.open, b.high, b.low, b.close, b.volume
+                    );
                 }
             }
             StreamEvent::TimeBars(bars) => {
                 for b in &bars {
-                    println!("TimeBar: o={:?} h={:?} l={:?} c={:?} v={:?}", b.open, b.high, b.low, b.close, b.volume);
+                    println!(
+                        "TimeBar: o={:?} h={:?} l={:?} c={:?} v={:?}",
+                        b.open, b.high, b.low, b.close, b.volume
+                    );
                 }
             }
             StreamEvent::VolumeBars(bars) => {
                 for b in &bars {
-                    println!("VolumeBar: o={:?} h={:?} l={:?} c={:?} v={:?}", b.open, b.high, b.low, b.close, b.volume);
+                    println!(
+                        "VolumeBar: o={:?} h={:?} l={:?} c={:?} v={:?}",
+                        b.open, b.high, b.low, b.close, b.volume
+                    );
                 }
             }
             StreamEvent::Indicators(indicators) => {
@@ -84,7 +101,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
             StreamEvent::Ping(_) => println!("keepalive"),
-            StreamEvent::Notification(r) => println!("notification: {:?} {:?}", r.status, r.message),
+            StreamEvent::Notification(r) => {
+                println!("notification: {:?} {:?}", r.status, r.message)
+            }
             _ => {}
         }
     }

@@ -96,10 +96,7 @@ pub(crate) async fn subscribe_indicator<H: HttpTransport>(
     stream_id: &str,
     req: &SubscribeBarsRequest,
 ) -> Result<IndicatorSubscribeResponse> {
-    let path = format!(
-        "/indicator/{stream_id}/{}/subscribe",
-        kind.as_str()
-    );
+    let path = format!("/indicator/{stream_id}/{}/subscribe", kind.as_str());
     request.post(&path, req).await
 }
 
@@ -137,9 +134,14 @@ mod tests {
     async fn subscribe_quotes_sends_correct_request() {
         let mock = MockHttp::new(vec![MockResponse::ok(r#"{"status":"OK"}"#)]);
         let req = test_request(mock);
-        subscribe_market(&req, MarketFeed::Quotes, "stream-123", &["XCME:ES.U25", "XCME:NQ.U25"])
-            .await
-            .unwrap();
+        subscribe_market(
+            &req,
+            MarketFeed::Quotes,
+            "stream-123",
+            &["XCME:ES.U25", "XCME:NQ.U25"],
+        )
+        .await
+        .unwrap();
 
         let reqs = req.http.recorded_requests();
         assert_eq!(reqs.len(), 1);
@@ -164,7 +166,12 @@ mod tests {
 
         let reqs = req.http.recorded_requests();
         assert_eq!(reqs[0].method, hyper::Method::GET);
-        assert!(reqs[0].uri.to_string().contains("/market/depths/unsubscribe/stream-456"));
+        assert!(
+            reqs[0]
+                .uri
+                .to_string()
+                .contains("/market/depths/unsubscribe/stream-456")
+        );
     }
 
     #[tokio::test]
@@ -176,7 +183,12 @@ mod tests {
             .unwrap();
 
         let reqs = req.http.recorded_requests();
-        assert!(reqs[0].uri.to_string().contains("/market/trades/subscribe/s1"));
+        assert!(
+            reqs[0]
+                .uri
+                .to_string()
+                .contains("/market/trades/subscribe/s1")
+        );
     }
 
     #[tokio::test]
@@ -201,10 +213,12 @@ mod tests {
 
         let reqs = request.http.recorded_requests();
         assert_eq!(reqs[0].method, hyper::Method::POST);
-        assert!(reqs[0]
-            .uri
-            .to_string()
-            .contains("/indicator/stream-789/tradeBars/subscribe"));
+        assert!(
+            reqs[0]
+                .uri
+                .to_string()
+                .contains("/indicator/stream-789/tradeBars/subscribe")
+        );
 
         let body: serde_json::Value = serde_json::from_slice(&reqs[0].body).unwrap();
         assert_eq!(body["symbol"], "XCME:ES.U25");
@@ -239,7 +253,9 @@ mod tests {
         let result = subscribe_market(&req, MarketFeed::Quotes, "s1", &["SYM"]).await;
 
         let err = result.unwrap_err();
-        assert!(matches!(err, Error::Api { status: 200, ref message } if message == "invalid stream"));
+        assert!(
+            matches!(err, Error::Api { status: 200, ref message } if message == "invalid stream")
+        );
     }
 
     #[tokio::test]
@@ -252,7 +268,9 @@ mod tests {
         let result = unsubscribe_market(&req, MarketFeed::Quotes, "s1", &["SYM"]).await;
 
         let err = result.unwrap_err();
-        assert!(matches!(err, Error::Api { status: 200, ref message } if message == "not subscribed"));
+        assert!(
+            matches!(err, Error::Api { status: 200, ref message } if message == "not subscribed")
+        );
     }
 
     #[tokio::test]

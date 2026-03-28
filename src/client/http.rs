@@ -145,7 +145,10 @@ pub(crate) mod mock {
 
         fn next_response(&self) -> MockResponse {
             let mut queue = self.responses.lock().unwrap();
-            assert!(!queue.is_empty(), "MockHttp: unexpected call — response queue is empty");
+            assert!(
+                !queue.is_empty(),
+                "MockHttp: unexpected call — response queue is empty"
+            );
             queue.remove(0)
         }
     }

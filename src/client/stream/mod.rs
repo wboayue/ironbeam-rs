@@ -67,7 +67,8 @@ impl<'a, H: HttpTransport> StreamBuilder<'a, H> {
         let token = extract_token(&self.client.request.auth_headers)?;
 
         // 3. Open WebSocket connection.
-        let ws = match connection::connect(&self.client.request.base_url, &stream_id, &token).await {
+        let ws = match connection::connect(&self.client.request.base_url, &stream_id, &token).await
+        {
             Ok(ws) => ws,
             Err(e) => {
                 // Stream session created on server but WebSocket failed.
@@ -81,7 +82,12 @@ impl<'a, H: HttpTransport> StreamBuilder<'a, H> {
         // 4. Spawn message loop.
         let (tx, rx) = mpsc::channel(self.channel_capacity);
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
-        let task = tokio::spawn(connection::message_loop(ws, tx, shutdown_rx, stream_id.clone()));
+        let task = tokio::spawn(connection::message_loop(
+            ws,
+            tx,
+            shutdown_rx,
+            stream_id.clone(),
+        ));
 
         Ok(StreamHandle {
             stream_id,

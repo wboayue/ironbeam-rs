@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use bytes::Bytes;
 use hyper::Method;
-use hyper::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
+use hyper::header::{CONTENT_TYPE, HeaderMap, HeaderValue};
 use serde::de::DeserializeOwned;
 
 use crate::error::{Error, Result, parse_api_error};
@@ -45,7 +45,9 @@ impl<H: HttpTransport> RequestHelper<H> {
             headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
             self.http.send(method, uri, body, &headers).await?
         } else {
-            self.http.send(method, uri, body, &self.auth_headers).await?
+            self.http
+                .send(method, uri, body, &self.auth_headers)
+                .await?
         };
 
         if !status.is_success() {
@@ -203,8 +205,8 @@ pub(crate) mod test_support {
 
     use hyper::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 
-    use super::{Client, RequestHelper};
     use super::http::mock::MockHttp;
+    use super::{Client, RequestHelper};
 
     /// Build a test client with no auth headers.
     pub fn test_client(mock: MockHttp) -> Client<MockHttp> {

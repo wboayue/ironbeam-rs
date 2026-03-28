@@ -8,8 +8,7 @@ use crate::types::{
     Response, SimulatedAccountAddCashRequest, SimulatedAccountCashReportResponse,
     SimulatedAccountExpireRequest, SimulatedAccountLiquidateRequest, SimulatedAccountResetRequest,
     SimulatedAccountSetRiskRequest, SimulatedTraderAddAccountRequest,
-    SimulatedTraderAddAccountResponse, SimulatedTraderCreateRequest,
-    SimulatedTraderCreateResponse,
+    SimulatedTraderAddAccountResponse, SimulatedTraderCreateRequest, SimulatedTraderCreateResponse,
 };
 
 impl<H: HttpTransport> Client<H> {
@@ -187,12 +186,15 @@ impl<H: HttpTransport> Client<H> {
         end_date: Date,
     ) -> Result<SimulatedAccountCashReportResponse> {
         let fmt = format_description!("[year][month][day]");
-        let start = start_date.format(fmt).map_err(|e| crate::error::Error::Other(e.to_string()))?;
-        let end = end_date.format(fmt).map_err(|e| crate::error::Error::Other(e.to_string()))?;
+        let start = start_date
+            .format(fmt)
+            .map_err(|e| crate::error::Error::Other(e.to_string()))?;
+        let end = end_date
+            .format(fmt)
+            .map_err(|e| crate::error::Error::Other(e.to_string()))?;
         let account_id = urlencoding::encode(account_id);
-        let path = format!(
-            "/simulatedAccount/getCashReport/{account_id}?startDate={start}&endDate={end}"
-        );
+        let path =
+            format!("/simulatedAccount/getCashReport/{account_id}?startDate={start}&endDate={end}");
         self.get(&path).await
     }
 
@@ -266,8 +268,8 @@ impl<H: HttpTransport> Client<H> {
 
 #[cfg(test)]
 mod tests {
-    use hyper::{Method, StatusCode};
     use hyper::header::AUTHORIZATION;
+    use hyper::{Method, StatusCode};
     use time::Month;
 
     use crate::client::http::mock::{MockHttp, MockResponse};
@@ -307,7 +309,10 @@ mod tests {
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::POST);
         assert!(reqs[0].uri.to_string().ends_with("/simulatedTraderCreate"));
-        assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");
+        assert_eq!(
+            reqs[0].headers.get(AUTHORIZATION).unwrap(),
+            "Bearer tok_test"
+        );
 
         let body: serde_json::Value = serde_json::from_slice(&reqs[0].body).unwrap();
         assert_eq!(body["FirstName"], "J");
@@ -322,7 +327,10 @@ mod tests {
         )]);
         let client = test_client_with_auth(mock);
 
-        let err = client.simulated_trader_create(&dummy_trader_create()).await.unwrap_err();
+        let err = client
+            .simulated_trader_create(&dummy_trader_create())
+            .await
+            .unwrap_err();
         match err {
             Error::Api { status, message } => {
                 assert_eq!(status, 400);
@@ -392,10 +400,7 @@ mod tests {
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::DELETE);
-        assert!(reqs[0]
-            .uri
-            .to_string()
-            .ends_with("/simulatedAccountExpire"));
+        assert!(reqs[0].uri.to_string().ends_with("/simulatedAccountExpire"));
 
         let body: serde_json::Value = serde_json::from_slice(&reqs[0].body).unwrap();
         assert_eq!(body["AccountId"], "ACC001");
@@ -417,10 +422,12 @@ mod tests {
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::POST);
-        assert!(reqs[0]
-            .uri
-            .to_string()
-            .ends_with("/simulatedAccount/addCash"));
+        assert!(
+            reqs[0]
+                .uri
+                .to_string()
+                .ends_with("/simulatedAccount/addCash")
+        );
 
         let body: serde_json::Value = serde_json::from_slice(&reqs[0].body).unwrap();
         assert_eq!(body["AccountId"], "ACC001");
@@ -476,10 +483,12 @@ mod tests {
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::POST);
-        assert!(reqs[0]
-            .uri
-            .to_string()
-            .ends_with("/simulatedAccount/liquidate"));
+        assert!(
+            reqs[0]
+                .uri
+                .to_string()
+                .ends_with("/simulatedAccount/liquidate")
+        );
 
         let body: serde_json::Value = serde_json::from_slice(&reqs[0].body).unwrap();
         assert_eq!(body["Accounts"], serde_json::json!(["ACC001", "ACC002"]));
@@ -514,10 +523,12 @@ mod tests {
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::POST);
-        assert!(reqs[0]
-            .uri
-            .to_string()
-            .ends_with("/simulatedAccount/setRisk"));
+        assert!(
+            reqs[0]
+                .uri
+                .to_string()
+                .ends_with("/simulatedAccount/setRisk")
+        );
 
         let body: serde_json::Value = serde_json::from_slice(&reqs[0].body).unwrap();
         assert_eq!(body["AccountId"], "ACC001");
@@ -533,10 +544,16 @@ mod tests {
         let mock = MockHttp::new(vec![MockResponse::ok(r#"{"TraderId":"T1"}"#)]);
         let client = test_client_with_auth(mock);
 
-        client.simulated_trader_create(&dummy_trader_create()).await.unwrap();
+        client
+            .simulated_trader_create(&dummy_trader_create())
+            .await
+            .unwrap();
 
         let reqs = client.request.http.recorded_requests();
-        assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");
+        assert_eq!(
+            reqs[0].headers.get(AUTHORIZATION).unwrap(),
+            "Bearer tok_test"
+        );
     }
 
     // --- malformed JSON ---
