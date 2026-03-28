@@ -148,6 +148,10 @@ pub(crate) async fn message_loop<W: WsTransport>(
                                 }
                             }
                             Err(e) => {
+                                tracing::error!("Failed to parse message: {e}");
+                                if let Ok(raw) = std::str::from_utf8(&payload) {
+                                    tracing::error!("Raw payload: {raw}");
+                                }
                                 let _ = tx.send(Err(Error::Json(e))).await;
                             }
                         }

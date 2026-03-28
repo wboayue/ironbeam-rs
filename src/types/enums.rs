@@ -2,7 +2,9 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 /// API response status.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// REST sends string values (`"OK"`), streaming sends integers (`0`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ResponseStatus {
     Ok,
@@ -11,6 +13,54 @@ pub enum ResponseStatus {
     Info,
     Fatal,
     Unknown,
+}
+
+impl<'de> Deserialize<'de> for ResponseStatus {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct ResponseStatusVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for ResponseStatusVisitor {
+            type Value = ResponseStatus;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a string or integer response status")
+            }
+
+            fn visit_u64<E: serde::de::Error>(self, v: u64) -> std::result::Result<ResponseStatus, E> {
+                match v {
+                    0 => Ok(ResponseStatus::Ok),
+                    1 => Ok(ResponseStatus::Error),
+                    2 => Ok(ResponseStatus::Warning),
+                    3 => Ok(ResponseStatus::Info),
+                    4 => Ok(ResponseStatus::Fatal),
+                    5 => Ok(ResponseStatus::Unknown),
+                    _ => Err(E::custom(format!("unknown response status integer: {v}"))),
+                }
+            }
+
+            fn visit_i64<E: serde::de::Error>(self, v: i64) -> std::result::Result<ResponseStatus, E> {
+                let v = u64::try_from(v).map_err(|_| E::custom(format!("negative response status: {v}")))?;
+                self.visit_u64(v)
+            }
+
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> std::result::Result<ResponseStatus, E> {
+                match v {
+                    "OK" => Ok(ResponseStatus::Ok),
+                    "ERROR" => Ok(ResponseStatus::Error),
+                    "WARNING" => Ok(ResponseStatus::Warning),
+                    "INFO" => Ok(ResponseStatus::Info),
+                    "FATAL" => Ok(ResponseStatus::Fatal),
+                    "UNKNOWN" => Ok(ResponseStatus::Unknown),
+                    _ => Err(E::custom(format!("unknown response status string: {v}"))),
+                }
+            }
+        }
+
+        deserializer.deserialize_any(ResponseStatusVisitor)
+    }
 }
 
 /// Account balance type.
@@ -531,6 +581,18 @@ mod tests {
         );
         assert_eq!(
             serde_json::from_str::<ResponseStatus>("\"ERROR\"").unwrap(),
+            ResponseStatus::Error
+        );
+    }
+
+    #[test]
+    fn response_status_from_integer() {
+        assert_eq!(
+            serde_json::from_str::<ResponseStatus>("0").unwrap(),
+            ResponseStatus::Ok
+        );
+        assert_eq!(
+            serde_json::from_str::<ResponseStatus>("1").unwrap(),
             ResponseStatus::Error
         );
     }

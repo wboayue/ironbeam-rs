@@ -13,6 +13,7 @@ use ironbeam_rs::client::{Client, Credentials};
 /// ```
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    tracing_subscriber::fmt().with_max_level(tracing::Level::DEBUG).init();
     let client = Client::builder()
         .credentials(Credentials {
             username: env::var("IRONBEAM_USERNAME")?,
