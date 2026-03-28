@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use fastwebsockets::Payload;
 use fastwebsockets::handshake;
 use fastwebsockets::{FragmentCollector, Frame, OpCode};
 use http_body_util::Empty;
@@ -47,9 +48,9 @@ impl WsTransport for FastWs {
                 .map_err(|e| Error::WebSocket(e.to_string()))?;
 
             match frame.opcode {
-                OpCode::Text => return Ok(WsMessage::Text(Bytes::from(Vec::from(frame.payload)))),
+                OpCode::Text => return Ok(WsMessage::Text(payload_to_bytes(frame.payload))),
                 OpCode::Binary => {
-                    return Ok(WsMessage::Binary(Bytes::from(Vec::from(frame.payload))))
+                    return Ok(WsMessage::Binary(payload_to_bytes(frame.payload)))
                 }
                 OpCode::Close => {
                     let reason = if frame.payload.len() > 2 {
@@ -71,6 +72,16 @@ impl WsTransport for FastWs {
             .write_frame(Frame::close(1000, b""))
             .await
             .map_err(|e| Error::WebSocket(e.to_string()))
+    }
+}
+
+/// Convert a WebSocket payload to `Bytes` with minimal copying.
+fn payload_to_bytes(payload: Payload<'_>) -> Bytes {
+    match payload {
+        Payload::Bytes(bm) => bm.freeze(),
+        Payload::Owned(vec) => Bytes::from(vec),
+        Payload::Borrowed(s) => Bytes::copy_from_slice(s),
+        Payload::BorrowedMut(s) => Bytes::copy_from_slice(s),
     }
 }
 
