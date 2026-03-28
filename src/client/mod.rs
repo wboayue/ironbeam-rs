@@ -9,7 +9,8 @@ pub use http::HttpTransport;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use bytes::Bytes;
-use hyper::header::HeaderMap;
+use hyper::Method;
+use hyper::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use serde::de::DeserializeOwned;
 
 use crate::error::{Error, Result, parse_api_error};
@@ -33,12 +34,21 @@ impl<H: HttpTransport> RequestHelper<H> {
     /// Core HTTP method — all convenience methods delegate here.
     async fn send<T: DeserializeOwned>(
         &self,
-        method: &str,
+        method: Method,
         path: &str,
         body: Option<Bytes>,
     ) -> Result<T> {
         let uri = format!("{}{path}", self.base_url).parse()?;
-        let (status, resp_body) = self.http.send(method, uri, body, &self.auth_headers).await?;
+
+        let headers = if body.is_some() {
+            let mut h = self.auth_headers.clone();
+            h.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+            h
+        } else {
+            self.auth_headers.clone()
+        };
+
+        let (status, resp_body) = self.http.send(method, uri, body, &headers).await?;
 
         if !status.is_success() {
             return Err(Error::Api {
@@ -51,7 +61,7 @@ impl<H: HttpTransport> RequestHelper<H> {
     }
 
     pub(crate) async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
-        self.send("GET", path, None).await
+        self.send(Method::GET, path, None).await
     }
 
     pub(crate) async fn post<B: serde::Serialize, T: DeserializeOwned>(
@@ -60,7 +70,7 @@ impl<H: HttpTransport> RequestHelper<H> {
         body: &B,
     ) -> Result<T> {
         let bytes = Bytes::from(serde_json::to_vec(body)?);
-        self.send("POST", path, Some(bytes)).await
+        self.send(Method::POST, path, Some(bytes)).await
     }
 
     pub(crate) async fn put<B: serde::Serialize, T: DeserializeOwned>(
@@ -69,11 +79,11 @@ impl<H: HttpTransport> RequestHelper<H> {
         body: &B,
     ) -> Result<T> {
         let bytes = Bytes::from(serde_json::to_vec(body)?);
-        self.send("PUT", path, Some(bytes)).await
+        self.send(Method::PUT, path, Some(bytes)).await
     }
 
     pub(crate) async fn delete<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
-        self.send("DELETE", path, None).await
+        self.send(Method::DELETE, path, None).await
     }
 
     pub(crate) async fn delete_with_body<B: serde::Serialize, T: DeserializeOwned>(
@@ -82,7 +92,7 @@ impl<H: HttpTransport> RequestHelper<H> {
         body: &B,
     ) -> Result<T> {
         let bytes = Bytes::from(serde_json::to_vec(body)?);
-        self.send("DELETE", path, Some(bytes)).await
+        self.send(Method::DELETE, path, Some(bytes)).await
     }
 }
 
@@ -182,7 +192,7 @@ impl<H: HttpTransport> Drop for Client<H> {
         let req = self.request.clone();
 
         handle.spawn(async move {
-            if let Err(e) = rest::auth::logout(&req.http, &req.base_url, &req.auth_headers).await {
+            if let Err(e) = rest::auth::logout(&req).await {
                 tracing::warn!("logout on drop failed: {e}");
             }
         });

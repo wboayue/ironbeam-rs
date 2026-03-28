@@ -1,4 +1,5 @@
 use time::Date;
+use time::macros::format_description;
 
 use crate::client::Client;
 use crate::client::http::HttpTransport;
@@ -185,8 +186,9 @@ impl<H: HttpTransport> Client<H> {
         start_date: Date,
         end_date: Date,
     ) -> Result<SimulatedAccountCashReportResponse> {
-        let start = format_date_yyyymmdd(start_date);
-        let end = format_date_yyyymmdd(end_date);
+        let fmt = format_description!("[year][month][day]");
+        let start = start_date.format(fmt).map_err(|e| crate::error::Error::Other(e.to_string()))?;
+        let end = end_date.format(fmt).map_err(|e| crate::error::Error::Other(e.to_string()))?;
         let path = format!(
             "/simulatedAccount/getCashReport/{account_id}?startDate={start}&endDate={end}"
         );
@@ -261,19 +263,9 @@ impl<H: HttpTransport> Client<H> {
     }
 }
 
-/// Format a date as a YYYYMMDD integer string for query parameters.
-fn format_date_yyyymmdd(date: Date) -> String {
-    format!(
-        "{:04}{:02}{:02}",
-        date.year(),
-        date.month() as u8,
-        date.day()
-    )
-}
-
 #[cfg(test)]
 mod tests {
-    use hyper::StatusCode;
+    use hyper::{Method, StatusCode};
     use hyper::header::AUTHORIZATION;
     use time::Month;
 
@@ -282,58 +274,8 @@ mod tests {
     use crate::error::Error;
     use crate::types::*;
 
-    use super::format_date_yyyymmdd;
-
-    #[test]
-    fn format_date_yyyymmdd_works() {
-        let date = time::Date::from_calendar_date(2025, Month::March, 5).unwrap();
-        assert_eq!(format_date_yyyymmdd(date), "20250305");
-    }
-
-    // --- simulated_trader_create ---
-
-    #[tokio::test]
-    async fn simulated_trader_create_returns_id() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"TraderId":"T001"}"#)]);
-        let client = test_client_with_auth(mock);
-
-        let req = SimulatedTraderCreateRequest {
-            first_name: "John".into(),
-            last_name: "Doe".into(),
-            address1: "123 Main".into(),
-            address2: None,
-            city: "Chicago".into(),
-            state: "IL".into(),
-            country: "US".into(),
-            zip_code: "60601".into(),
-            phone: "555-0100".into(),
-            email: "john@example.com".into(),
-            password: "secret".into(),
-            template_id: "XAP100".into(),
-        };
-
-        let trader_id = client.simulated_trader_create(&req).await.unwrap();
-        assert_eq!(trader_id, "T001");
-
-        let reqs = client.request.http.recorded_requests();
-        assert_eq!(reqs[0].method, "POST");
-        assert!(reqs[0].uri.to_string().ends_with("/simulatedTraderCreate"));
-        assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");
-
-        let body: serde_json::Value = serde_json::from_slice(&reqs[0].body).unwrap();
-        assert_eq!(body["FirstName"], "John");
-        assert_eq!(body["TemplateId"], "XAP100");
-    }
-
-    #[tokio::test]
-    async fn simulated_trader_create_api_error() {
-        let mock = MockHttp::new(vec![MockResponse::error(
-            StatusCode::BAD_REQUEST,
-            r#"{"error1":"Invalid template"}"#,
-        )]);
-        let client = test_client_with_auth(mock);
-
-        let req = SimulatedTraderCreateRequest {
+    fn dummy_trader_create() -> SimulatedTraderCreateRequest {
+        SimulatedTraderCreateRequest {
             first_name: "J".into(),
             last_name: "D".into(),
             address1: "x".into(),
@@ -345,10 +287,41 @@ mod tests {
             phone: "x".into(),
             email: "x".into(),
             password: "x".into(),
-            template_id: "BAD".into(),
-        };
+            template_id: "XAP100".into(),
+        }
+    }
 
-        let err = client.simulated_trader_create(&req).await.unwrap_err();
+    // --- simulated_trader_create ---
+
+    #[tokio::test]
+    async fn simulated_trader_create_returns_id() {
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"TraderId":"T001"}"#)]);
+        let client = test_client_with_auth(mock);
+
+        let req = dummy_trader_create();
+
+        let trader_id = client.simulated_trader_create(&req).await.unwrap();
+        assert_eq!(trader_id, "T001");
+
+        let reqs = client.request.http.recorded_requests();
+        assert_eq!(reqs[0].method, Method::POST);
+        assert!(reqs[0].uri.to_string().ends_with("/simulatedTraderCreate"));
+        assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");
+
+        let body: serde_json::Value = serde_json::from_slice(&reqs[0].body).unwrap();
+        assert_eq!(body["FirstName"], "J");
+        assert_eq!(body["TemplateId"], "XAP100");
+    }
+
+    #[tokio::test]
+    async fn simulated_trader_create_api_error() {
+        let mock = MockHttp::new(vec![MockResponse::error(
+            StatusCode::BAD_REQUEST,
+            r#"{"error1":"Invalid template"}"#,
+        )]);
+        let client = test_client_with_auth(mock);
+
+        let err = client.simulated_trader_create(&dummy_trader_create()).await.unwrap_err();
         match err {
             Error::Api { status, message } => {
                 assert_eq!(status, 400);
@@ -375,7 +348,7 @@ mod tests {
         assert_eq!(account_id, "ACC001");
 
         let reqs = client.request.http.recorded_requests();
-        assert_eq!(reqs[0].method, "POST");
+        assert_eq!(reqs[0].method, Method::POST);
         assert!(reqs[0].uri.to_string().ends_with("/simulatedAccountAdd"));
     }
 
@@ -395,7 +368,7 @@ mod tests {
         assert_eq!(resp.status, ResponseStatus::Ok);
 
         let reqs = client.request.http.recorded_requests();
-        assert_eq!(reqs[0].method, "PUT");
+        assert_eq!(reqs[0].method, Method::PUT);
         assert!(reqs[0].uri.to_string().ends_with("/simulatedAccountReset"));
 
         let body: serde_json::Value = serde_json::from_slice(&reqs[0].body).unwrap();
@@ -417,7 +390,7 @@ mod tests {
         assert_eq!(resp.status, ResponseStatus::Ok);
 
         let reqs = client.request.http.recorded_requests();
-        assert_eq!(reqs[0].method, "DELETE");
+        assert_eq!(reqs[0].method, Method::DELETE);
         assert!(reqs[0]
             .uri
             .to_string()
@@ -442,7 +415,7 @@ mod tests {
         client.simulated_account_add_cash(&req).await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
-        assert_eq!(reqs[0].method, "POST");
+        assert_eq!(reqs[0].method, Method::POST);
         assert!(reqs[0]
             .uri
             .to_string()
@@ -474,7 +447,7 @@ mod tests {
         assert_eq!(resp.cash_report.len(), 1);
 
         let reqs = client.request.http.recorded_requests();
-        assert_eq!(reqs[0].method, "GET");
+        assert_eq!(reqs[0].method, Method::GET);
         let uri = reqs[0].uri.to_string();
         assert!(uri.contains("/simulatedAccount/getCashReport/ACC001"));
         assert!(uri.contains("startDate=20250101"));
@@ -501,7 +474,7 @@ mod tests {
         client.simulated_account_liquidate(&req).await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
-        assert_eq!(reqs[0].method, "POST");
+        assert_eq!(reqs[0].method, Method::POST);
         assert!(reqs[0]
             .uri
             .to_string()
@@ -539,7 +512,7 @@ mod tests {
         client.simulated_account_set_risk(&req).await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
-        assert_eq!(reqs[0].method, "POST");
+        assert_eq!(reqs[0].method, Method::POST);
         assert!(reqs[0]
             .uri
             .to_string()
@@ -559,22 +532,7 @@ mod tests {
         let mock = MockHttp::new(vec![MockResponse::ok(r#"{"TraderId":"T1"}"#)]);
         let client = test_client_with_auth(mock);
 
-        let req = SimulatedTraderCreateRequest {
-            first_name: "J".into(),
-            last_name: "D".into(),
-            address1: "x".into(),
-            address2: None,
-            city: "x".into(),
-            state: "x".into(),
-            country: "x".into(),
-            zip_code: "x".into(),
-            phone: "x".into(),
-            email: "x".into(),
-            password: "x".into(),
-            template_id: "XAP50".into(),
-        };
-
-        client.simulated_trader_create(&req).await.unwrap();
+        client.simulated_trader_create(&dummy_trader_create()).await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");

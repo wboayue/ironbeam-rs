@@ -3,8 +3,8 @@ use std::future::Future;
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
 use hyper::body::Incoming;
-use hyper::header::{CONTENT_TYPE, HeaderMap, HeaderValue};
-use hyper::{Response, StatusCode, Uri};
+use hyper::header::HeaderMap;
+use hyper::{Method, Response, StatusCode, Uri};
 use hyper_util::client::legacy::Client as HyperClient;
 use hyper_util::rt::TokioExecutor;
 
@@ -17,7 +17,7 @@ use crate::error::{Error, Result};
 pub trait HttpTransport: Clone + Send + Sync + 'static {
     fn send(
         &self,
-        method: &str,
+        method: Method,
         uri: Uri,
         body: Option<Bytes>,
         headers: &HeaderMap,
@@ -55,17 +55,13 @@ impl HttpClient {
 impl HttpTransport for HttpClient {
     async fn send(
         &self,
-        method: &str,
+        method: Method,
         uri: Uri,
         body: Option<Bytes>,
         headers: &HeaderMap,
     ) -> Result<(StatusCode, Bytes)> {
         let mut builder = hyper::Request::builder().method(method).uri(uri);
 
-        if body.is_some() {
-            builder =
-                builder.header(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-        }
         for (key, value) in headers {
             builder = builder.header(key, value);
         }
@@ -88,7 +84,7 @@ pub(crate) mod mock {
 
     use bytes::Bytes;
     use hyper::header::HeaderMap;
-    use hyper::{StatusCode, Uri};
+    use hyper::{Method, StatusCode, Uri};
 
     use crate::error::Result;
 
@@ -97,7 +93,7 @@ pub(crate) mod mock {
     /// Record of a single HTTP call.
     #[derive(Debug, Clone)]
     pub struct RecordedRequest {
-        pub method: String,
+        pub method: Method,
         pub uri: Uri,
         pub headers: HeaderMap,
         pub body: Bytes,
@@ -157,13 +153,13 @@ pub(crate) mod mock {
     impl HttpTransport for MockHttp {
         async fn send(
             &self,
-            method: &str,
+            method: Method,
             uri: Uri,
             body: Option<Bytes>,
             headers: &HeaderMap,
         ) -> Result<(StatusCode, Bytes)> {
             self.requests.lock().unwrap().push(RecordedRequest {
-                method: method.to_owned(),
+                method,
                 uri,
                 headers: headers.clone(),
                 body: body.unwrap_or_default(),

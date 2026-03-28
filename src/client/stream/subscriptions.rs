@@ -143,7 +143,7 @@ mod tests {
 
         let reqs = req.http.recorded_requests();
         assert_eq!(reqs.len(), 1);
-        assert_eq!(reqs[0].method, "GET");
+        assert_eq!(reqs[0].method, hyper::Method::GET);
         assert_eq!(
             reqs[0].uri.to_string(),
             "http://test/market/quotes/subscribe/stream-123?symbols=XCME%3AES.U25,XCME%3ANQ.U25"
@@ -163,7 +163,7 @@ mod tests {
             .unwrap();
 
         let reqs = req.http.recorded_requests();
-        assert_eq!(reqs[0].method, "GET");
+        assert_eq!(reqs[0].method, hyper::Method::GET);
         assert!(reqs[0].uri.to_string().contains("/market/depths/unsubscribe/stream-456"));
     }
 
@@ -200,7 +200,7 @@ mod tests {
         assert_eq!(resp.indicator_id, "IND1");
 
         let reqs = request.http.recorded_requests();
-        assert_eq!(reqs[0].method, "POST");
+        assert_eq!(reqs[0].method, hyper::Method::POST);
         assert!(reqs[0]
             .uri
             .to_string()
@@ -222,7 +222,7 @@ mod tests {
             .unwrap();
 
         let reqs = req.http.recorded_requests();
-        assert_eq!(reqs[0].method, "DELETE");
+        assert_eq!(reqs[0].method, hyper::Method::DELETE);
         assert_eq!(
             reqs[0].uri.to_string(),
             "http://test/indicator/stream-1/unsubscribe/IND-ABC"

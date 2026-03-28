@@ -45,7 +45,7 @@ mod tests {
 
         assert_eq!(accounts, vec!["ACC1", "ACC2"]);
         let reqs = client.request.http.recorded_requests();
-        assert_eq!(reqs[0].method, "GET");
+        assert_eq!(reqs[0].method, hyper::Method::GET);
         assert!(reqs[0].uri.to_string().ends_with("/account/getAllAccounts"));
     }
 
