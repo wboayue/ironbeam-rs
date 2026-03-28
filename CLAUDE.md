@@ -122,6 +122,21 @@ QuoteFull, Depth/DepthLevel, TradeBar, TickBar, TimeBar, VolumeBar
 
 ### Documentation
 - All public types and methods get rustdoc with inline examples.
+- Public API methods on `Client` must include a `# Example` section with a `no_run` doc test showing async usage. Use hidden setup lines (`# `) for builder/connect boilerplate so the visible example focuses on the method call:
+  ```rust
+  /// # Example
+  ///
+  /// ```no_run
+  /// # use ironbeam_rs::client::{Client, Credentials};
+  /// # async fn example() -> ironbeam_rs::error::Result<()> {
+  /// # let client = Client::builder()
+  /// #     .credentials(Credentials { username: "u".into(), password: "p".into(), api_key: "k".into() })
+  /// #     .connect().await?;
+  /// let accounts = client.all_accounts().await?;
+  /// # Ok(())
+  /// # }
+  /// ```
+  ```
 - `examples/` folder has runnable examples for each API domain, suitable for copy-paste.
 - Examples use `#[tokio::main]` and show error handling.
 - Keep doc examples in sync with actual API types. Run `cargo test --doc` to verify.

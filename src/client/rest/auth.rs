@@ -69,6 +69,19 @@ pub async fn logout(http: &impl HttpTransport, base_url: &str, headers: &HeaderM
 
 impl<H: HttpTransport> Client<H> {
     /// Log out and invalidate the current bearer token.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use ironbeam_rs::client::{Client, Credentials};
+    /// # async fn example() -> ironbeam_rs::error::Result<()> {
+    /// # let client = Client::builder()
+    /// #     .credentials(Credentials { username: "u".into(), password: "p".into(), api_key: "k".into() })
+    /// #     .connect().await?;
+    /// client.logout().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn logout(&self) -> Result<()> {
         logout(&self.http, &self.base_url, &self.auth_headers).await?;
         self.is_logged_out.store(true, Ordering::Release);

@@ -5,6 +5,20 @@ use crate::types::AllAccountsResponse;
 
 impl<H: HttpTransport> Client<H> {
     /// Get all accounts for the authenticated trader.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use ironbeam_rs::client::{Client, Credentials};
+    /// # async fn example() -> ironbeam_rs::error::Result<()> {
+    /// # let client = Client::builder()
+    /// #     .credentials(Credentials { username: "u".into(), password: "p".into(), api_key: "k".into() })
+    /// #     .connect().await?;
+    /// let accounts = client.all_accounts().await?;
+    /// println!("Accounts: {accounts:?}");
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn all_accounts(&self) -> Result<Vec<String>> {
         let resp: AllAccountsResponse = self.get("/account/getAllAccounts").await?;
         Ok(resp.accounts)
