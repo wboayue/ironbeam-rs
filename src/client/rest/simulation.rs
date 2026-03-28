@@ -161,7 +161,7 @@ impl<H: HttpTransport> Client<H> {
 
     /// Get the cash report for a simulated account (demo only).
     ///
-    /// Dates are formatted as YYYYMMDD integers in the query string.
+    /// Dates are formatted as YYYYMMDD strings in the query string.
     ///
     /// # Example
     ///
@@ -189,6 +189,7 @@ impl<H: HttpTransport> Client<H> {
         let fmt = format_description!("[year][month][day]");
         let start = start_date.format(fmt).map_err(|e| crate::error::Error::Other(e.to_string()))?;
         let end = end_date.format(fmt).map_err(|e| crate::error::Error::Other(e.to_string()))?;
+        let account_id = urlencoding::encode(account_id);
         let path = format!(
             "/simulatedAccount/getCashReport/{account_id}?startDate={start}&endDate={end}"
         );

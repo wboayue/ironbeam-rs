@@ -53,8 +53,7 @@ pub async fn authenticate(
 
 /// Invalidate the bearer token.
 pub async fn logout<H: HttpTransport>(request: &crate::client::RequestHelper<H>) -> Result<()> {
-    let empty = serde_json::value::Value::Object(serde_json::Map::new());
-    let resp: SuccessResponse = request.post("/logout", &empty).await?;
+    let resp: SuccessResponse = request.post("/logout", &serde_json::json!({})).await?;
 
     if resp.status != ResponseStatus::Ok {
         return Err(Error::Auth(
@@ -124,6 +123,10 @@ mod tests {
         assert_eq!(reqs.len(), 1);
         assert_eq!(reqs[0].method, hyper::Method::POST);
         assert!(reqs[0].uri.to_string().contains("/logout"));
+        assert_eq!(
+            reqs[0].headers.get(hyper::header::CONTENT_TYPE).unwrap(),
+            "application/json"
+        );
     }
 
     #[tokio::test]

@@ -40,15 +40,13 @@ impl<H: HttpTransport> RequestHelper<H> {
     ) -> Result<T> {
         let uri = format!("{}{path}", self.base_url).parse()?;
 
-        let headers = if body.is_some() {
-            let mut h = self.auth_headers.clone();
-            h.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-            h
+        let (status, resp_body) = if body.is_some() {
+            let mut headers = self.auth_headers.clone();
+            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+            self.http.send(method, uri, body, &headers).await?
         } else {
-            self.auth_headers.clone()
+            self.http.send(method, uri, body, &self.auth_headers).await?
         };
-
-        let (status, resp_body) = self.http.send(method, uri, body, &headers).await?;
 
         if !status.is_success() {
             return Err(Error::Api {
