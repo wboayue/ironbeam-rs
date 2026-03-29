@@ -6,7 +6,7 @@ use ironbeam_rs::client::{Client, Credentials, SymbolSearchParams};
 
 /// Pause to stay under the API's 10-requests-per-second rate limit.
 async fn pace() {
-    tokio::time::sleep(Duration::from_millis(150)).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
 }
 
 /// Demonstrate info API endpoints.
@@ -37,37 +37,33 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let user = client.user_info(None).await?;
     println!("User: {:?}, email: {:?}", user.account_title, user.email_address_1);
 
-    // Exchanges → complexes
+    // Exchanges
     pace().await;
     let exchanges = client.exchange_sources().await?;
     println!("\nExchanges: {exchanges:?}");
 
-    if let Some(exchange) = exchanges.first() {
-        pace().await;
-        let complexes = client.complexes(exchange).await?;
-        println!("Complexes for {exchange}:");
-        for c in &complexes {
-            println!("  {:?}: {} groups", c.name, c.groups.len());
-        }
+    // Futures search — returns unqualified symbols (e.g. "ES.M26")
+    pace().await;
+    let futures = client.futures_symbols("CME", "ES").await?;
+    println!("\nFutures for CME ES ({} contracts):", futures.len());
+    for f in futures.iter().take(4) {
+        println!("  {} {:?} ({:?}/{:?})", f.symbol, f.description, f.maturity_month, f.maturity_year);
     }
 
     // Symbol search
     pace().await;
-    let params = SymbolSearchParams::new()
-        .text("ESM")
-        .limit(5)
-        .prefer_active(true);
+    let params = SymbolSearchParams::new().text("GOLD").limit(5);
     let symbols = client.symbols(&params).await?;
-    println!("\nSymbol search 'ESM':");
+    println!("\nSymbol search 'GOLD':");
     for s in &symbols {
         println!("  {}: {:?} ({:?})", s.symbol, s.description, s.symbol_type);
     }
 
-    // Security definitions (use first search result, or a well-known symbol)
+    // Security definitions — use a known exchange-qualified symbol
     let lookup_sym = symbols
         .first()
         .map(|s| s.symbol.clone())
-        .unwrap_or_else(|| "CME:ESM5".into());
+        .unwrap_or_else(|| "XNYM:GCM.H26".into());
 
     pace().await;
     let defs = client.security_definitions(&[&lookup_sym]).await?;
@@ -105,6 +101,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     );
 
     // Explicit logout preferred over drop-based cleanup for guaranteed session teardown.
+    pace().await;
     client.logout().await?;
 
     Ok(())
