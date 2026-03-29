@@ -159,6 +159,23 @@ impl<H: HttpTransport> Client<H> {
         self.request.get(path).await
     }
 
+    /// GET `{path}?symbols=` with validation (non-empty, max 10) and URL encoding.
+    pub(crate) async fn symbol_query<T: DeserializeOwned>(
+        &self,
+        path: &str,
+        symbols: &[&str],
+    ) -> Result<T> {
+        if symbols.is_empty() {
+            return Err(Error::Other("symbols must not be empty".into()));
+        }
+        if symbols.len() > 10 {
+            return Err(Error::Other("symbols is limited to 10".into()));
+        }
+        let joined = symbols.join(",");
+        let encoded = urlencoding::encode(&joined);
+        self.get(&format!("{path}?symbols={encoded}")).await
+    }
+
     pub(crate) async fn post<B: serde::Serialize, T: DeserializeOwned>(
         &self,
         path: &str,

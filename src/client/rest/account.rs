@@ -79,8 +79,9 @@ impl<H: HttpTransport> Client<H> {
     /// ```
     pub async fn positions(&self, account_id: &str) -> Result<Vec<Position>> {
         let account_id = urlencoding::encode(account_id);
-        let resp: PositionsResponse =
-            self.get(&format!("/account/{account_id}/positions")).await?;
+        let resp: PositionsResponse = self
+            .get(&format!("/account/{account_id}/positions"))
+            .await?;
         Ok(resp.positions)
     }
 
@@ -103,8 +104,7 @@ impl<H: HttpTransport> Client<H> {
     /// ```
     pub async fn risk(&self, account_id: &str) -> Result<Vec<RiskInfo>> {
         let account_id = urlencoding::encode(account_id);
-        let resp: AccountRiskResponse =
-            self.get(&format!("/account/{account_id}/risk")).await?;
+        let resp: AccountRiskResponse = self.get(&format!("/account/{account_id}/risk")).await?;
         Ok(resp.risks)
     }
 
@@ -127,8 +127,7 @@ impl<H: HttpTransport> Client<H> {
     /// ```
     pub async fn fills(&self, account_id: &str) -> Result<Vec<OrderFill>> {
         let account_id = urlencoding::encode(account_id);
-        let resp: AccountFillsResponse =
-            self.get(&format!("/account/{account_id}/fills")).await?;
+        let resp: AccountFillsResponse = self.get(&format!("/account/{account_id}/fills")).await?;
         Ok(resp.fills)
     }
 
@@ -177,8 +176,7 @@ impl<H: HttpTransport> Client<H> {
     /// # }
     /// ```
     pub async fn all_positions(&self) -> Result<Vec<AccountPositions>> {
-        let resp: AccountsPositionsResponse =
-            self.get("/account/getAllPositions").await?;
+        let resp: AccountsPositionsResponse = self.get("/account/getAllPositions").await?;
         Ok(resp.positions)
     }
 
@@ -374,10 +372,7 @@ mod tests {
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
-        assert!(reqs[0]
-            .uri
-            .to_string()
-            .ends_with("/account/ACC1/positions"));
+        assert!(reqs[0].uri.to_string().ends_with("/account/ACC1/positions"));
     }
 
     // --- risk ---
@@ -490,10 +485,12 @@ mod tests {
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
-        assert!(reqs[0]
-            .uri
-            .to_string()
-            .ends_with("/account/getAllPositions"));
+        assert!(
+            reqs[0]
+                .uri
+                .to_string()
+                .ends_with("/account/getAllPositions")
+        );
     }
 
     // --- all_risk ---
@@ -520,10 +517,7 @@ mod tests {
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
-        assert!(reqs[0]
-            .uri
-            .to_string()
-            .ends_with("/account/getAllRiskInfo"));
+        assert!(reqs[0].uri.to_string().ends_with("/account/getAllRiskInfo"));
     }
 
     // --- all_fills ---
@@ -550,9 +544,6 @@ mod tests {
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
-        assert!(reqs[0]
-            .uri
-            .to_string()
-            .ends_with("/account/getAllFills"));
+        assert!(reqs[0].uri.to_string().ends_with("/account/getAllFills"));
     }
 }

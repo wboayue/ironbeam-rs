@@ -29,9 +29,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Per-account queries using first account
     if let Some(account_id) = accounts.first() {
-        let balances = client
-            .balance(account_id, BalanceType::CurrentOpen)
-            .await?;
+        let balances = client.balance(account_id, BalanceType::CurrentOpen).await?;
         println!("\nBalances for {account_id}:");
         for b in &balances {
             println!(
@@ -43,7 +41,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let positions = client.positions(account_id).await?;
         println!("\nPositions for {account_id}:");
         for p in &positions {
-            println!("  {:?} {:?} {:?} @ {:?}", p.exch_sym, p.side, p.quantity, p.price);
+            println!(
+                "  {:?} {:?} {:?} @ {:?}",
+                p.exch_sym, p.side, p.quantity, p.price
+            );
         }
 
         let risks = client.risk(account_id).await?;
@@ -58,7 +59,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let fills = client.fills(account_id).await?;
         println!("\nFills for {account_id}: {} fill(s)", fills.len());
         for f in &fills {
-            println!("  {} {:?} @ {:?}", f.exch_sym, f.fill_quantity, f.fill_price);
+            println!(
+                "  {} {:?} @ {:?}",
+                f.exch_sym, f.fill_quantity, f.fill_price
+            );
         }
     }
 
