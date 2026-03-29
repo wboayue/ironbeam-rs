@@ -50,11 +50,16 @@ impl<'de, T: Copy> serde::de::Visitor<'de> for DualFormatVisitor<T> {
 
 /// Generate a dual-format enum that deserializes from both strings (REST) and
 /// integers (streaming). Serialization always uses the string form.
+///
+/// Two forms:
+/// - `Variant = (int, "STR")` — single string mapping
+/// - `Variant = (int, "STR", ["ALIAS1", "ALIAS2"])` — canonical string + aliases
 macro_rules! dual_format_enum {
+    // Arm with optional aliases: each variant is (int, "canonical" [, ["alias", ...]])
     (
         $(#[$meta:meta])*
         $vis:vis enum $Name:ident {
-            $( $(#[$vmeta:meta])* $Variant:ident = ($int:expr, $str:expr) ),+ $(,)?
+            $( $(#[$vmeta:meta])* $Variant:ident = ($int:expr, $str:expr $(, [$($alias:expr),* $(,)?])? ) ),+ $(,)?
         }
     ) => {
         $(#[$meta])*
@@ -76,7 +81,9 @@ macro_rules! dual_format_enum {
                 D: serde::Deserializer<'de>,
             {
                 static INT_MAP: &[(u64, $Name)] = &[$( ($int, $Name::$Variant), )+];
-                static STR_MAP: &[(&str, $Name)] = &[$( ($str, $Name::$Variant), )+];
+                static STR_MAP: &[(&str, $Name)] = &[
+                    $( ($str, $Name::$Variant), $( $( ($alias, $Name::$Variant), )* )? )+
+                ];
 
                 deserializer.deserialize_any(DualFormatVisitor {
                     type_name: stringify!($Name),
@@ -121,38 +128,36 @@ pub enum OrderSide {
     Invalid,
 }
 
-/// Order type. Wire format uses string-encoded numbers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum OrderType {
-    /// Invalid / unset.
-    #[serde(rename = "")]
-    Invalid,
-    /// Market order.
-    #[serde(rename = "1")]
-    Market,
-    /// Limit order.
-    #[serde(rename = "2")]
-    Limit,
-    /// Stop order.
-    #[serde(rename = "3")]
-    Stop,
-    /// Stop-limit order.
-    #[serde(rename = "4")]
-    StopLimit,
+dual_format_enum! {
+    /// Order type.
+    ///
+    /// REST sends string names (`"LIMIT"`), streaming sends string-encoded numbers (`"2"`).
+    pub enum OrderType {
+        /// Invalid / unset.
+        Invalid = (0, "", ["INVALID"]),
+        /// Market order.
+        Market = (1, "1", ["MARKET"]),
+        /// Limit order.
+        Limit = (2, "2", ["LIMIT"]),
+        /// Stop order.
+        Stop = (3, "3", ["STOP"]),
+        /// Stop-limit order.
+        StopLimit = (4, "4", ["STOP_LIMIT"]),
+    }
 }
 
-/// Order duration. Wire format uses string-encoded numbers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum DurationType {
-    /// Invalid / unset.
-    #[serde(rename = "")]
-    Invalid,
-    /// Day order.
-    #[serde(rename = "0")]
-    Day,
-    /// Good till cancel.
-    #[serde(rename = "1")]
-    GoodTillCancel,
+dual_format_enum! {
+    /// Order duration.
+    ///
+    /// REST sends string names (`"DAY"`), streaming sends string-encoded numbers (`"0"`).
+    pub enum DurationType {
+        /// Invalid / unset.
+        Invalid = (99, "", ["INVALID"]),
+        /// Day order.
+        Day = (0, "0", ["DAY"]),
+        /// Good till cancel.
+        GoodTillCancel = (1, "1", ["GOOD_TILL_CANCEL", "GTC"]),
+    }
 }
 
 /// Order status.
