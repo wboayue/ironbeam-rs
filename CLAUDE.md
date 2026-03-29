@@ -15,6 +15,14 @@ Documentation in `specs/`. Start with `specs/README.md` for auth pattern, stream
 - `specs/simulation.md` — demo-only simulated trader/account management
 - `specs/types.md` — all enums, type aliases, and data structures
 
+## API Rate Limit
+
+- Hard limit of **10 requests per second** (sliding window). Auth and logout count toward this limit.
+- Exceeding the limit returns HTTP 429. Once tripped, the cooldown is **15–30 seconds** — not just the next second.
+- 429 errors themselves appear to count toward the limit, causing cascading failures.
+- Examples must pace calls (≥250ms between requests) and keep total calls under 10/sec including auth/logout.
+- Symbol search (`/info/symbols`) requires a minimum of 3 characters in the `text` parameter; shorter strings return 400 "Invalid text length".
+
 ## Architecture
 
 ### Design Principles
