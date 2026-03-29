@@ -30,6 +30,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             api_key: env::var("IRONBEAM_API_KEY")?,
         })
         .demo()
+        .rate_limit(8)
         .connect()
         .await?;
 

@@ -1,14 +1,12 @@
-use serde::de::DeserializeOwned;
-
 use crate::client::Client;
 use crate::client::http::HttpTransport;
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::types::{
     ComplexGroupInfo, ComplexGroups, ComplexGroupsResponse, ComplexesResponse,
     ExchangeSourcesResponse, FutureInfo, SecurityDefinition, SecurityDefinitionsResponse,
-    SecurityMarginAndValue, SecurityMarginAndValueResponse, SecurityStatus,
-    SecurityStatusResponse, Spread, StrategyIdResponse, Symbol, SymbolFuturesResponse,
-    SymbolInfo, SymbolOptionSpreadsResponse, SymbolOptionsResponse, SymbolOptionsResult,
+    SecurityMarginAndValue, SecurityMarginAndValueResponse, SecurityStatus, SecurityStatusResponse,
+    Spread, StrategyIdResponse, Symbol, SymbolFuturesResponse, SymbolInfo,
+    SymbolOptionSpreadsResponse, SymbolOptionsResponse, SymbolOptionsResult,
     SymbolSearchOptionsResponse, SymbolsResponse, TraderInfo, TraderInfoResponse, UserInfo,
     UserInfoResponse,
 };
@@ -88,27 +86,6 @@ impl<'a> SymbolSearchParams<'a> {
 // ---------------------------------------------------------------------------
 
 impl<H: HttpTransport> Client<H> {
-    /// Shared helper for `/info/security/{kind}?symbols=` endpoints.
-    ///
-    /// Validates that `symbols` is non-empty and contains at most 10 entries
-    /// (API limit).
-    async fn security_query<T: DeserializeOwned>(
-        &self,
-        kind: &str,
-        symbols: &[&str],
-    ) -> Result<T> {
-        if symbols.is_empty() {
-            return Err(Error::Other("symbols must not be empty".into()));
-        }
-        if symbols.len() > 10 {
-            return Err(Error::Other("symbols is limited to 10".into()));
-        }
-        let joined = symbols.join(",");
-        let encoded = urlencoding::encode(&joined);
-        self.get(&format!("/info/security/{kind}?symbols={encoded}"))
-            .await
-    }
-
     /// Get trader info (accounts list, live/demo status).
     ///
     /// # Example
@@ -176,12 +153,10 @@ impl<H: HttpTransport> Client<H> {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn security_definitions(
-        &self,
-        symbols: &[&str],
-    ) -> Result<Vec<SecurityDefinition>> {
-        let resp: SecurityDefinitionsResponse =
-            self.security_query("definitions", symbols).await?;
+    pub async fn security_definitions(&self, symbols: &[&str]) -> Result<Vec<SecurityDefinition>> {
+        let resp: SecurityDefinitionsResponse = self
+            .symbol_query("/info/security/definitions", symbols)
+            .await?;
         Ok(resp.security_definitions)
     }
 
@@ -202,12 +177,9 @@ impl<H: HttpTransport> Client<H> {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn security_margin(
-        &self,
-        symbols: &[&str],
-    ) -> Result<Vec<SecurityMarginAndValue>> {
+    pub async fn security_margin(&self, symbols: &[&str]) -> Result<Vec<SecurityMarginAndValue>> {
         let resp: SecurityMarginAndValueResponse =
-            self.security_query("margin", symbols).await?;
+            self.symbol_query("/info/security/margin", symbols).await?;
         Ok(resp.security_margin_and_values)
     }
 
@@ -229,7 +201,8 @@ impl<H: HttpTransport> Client<H> {
     /// # }
     /// ```
     pub async fn security_status(&self, symbols: &[&str]) -> Result<Vec<SecurityStatus>> {
-        let resp: SecurityStatusResponse = self.security_query("status", symbols).await?;
+        let resp: SecurityStatusResponse =
+            self.symbol_query("/info/security/status", symbols).await?;
         Ok(resp.security_statuses)
     }
 
@@ -296,8 +269,7 @@ impl<H: HttpTransport> Client<H> {
     /// ```
     pub async fn complexes(&self, exchange: &str) -> Result<Vec<ComplexGroups>> {
         let exchange = urlencoding::encode(exchange);
-        let resp: ComplexesResponse =
-            self.get(&format!("/info/complexes/{exchange}")).await?;
+        let resp: ComplexesResponse = self.get(&format!("/info/complexes/{exchange}")).await?;
         Ok(resp.market_complexes)
     }
 
@@ -536,9 +508,7 @@ mod tests {
 
     #[tokio::test]
     async fn user_info_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(
-            r#"{"accounts":[]}"#,
-        )]);
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"accounts":[]}"#)]);
         let client = test_client_with_auth(mock);
 
         client.user_info(Some("T1")).await.unwrap();
@@ -566,9 +536,7 @@ mod tests {
 
     #[tokio::test]
     async fn security_definitions_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(
-            r#"{"securityDefinitions":[]}"#,
-        )]);
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"securityDefinitions":[]}"#)]);
         let client = test_client_with_auth(mock);
 
         client
@@ -600,9 +568,7 @@ mod tests {
 
     #[tokio::test]
     async fn security_margin_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(
-            r#"{"securityMarginAndValues":[]}"#,
-        )]);
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"securityMarginAndValues":[]}"#)]);
         let client = test_client_with_auth(mock);
 
         client.security_margin(&["XCME:ES.U16"]).await.unwrap();
@@ -629,9 +595,7 @@ mod tests {
 
     #[tokio::test]
     async fn security_status_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(
-            r#"{"securityStatuses":[]}"#,
-        )]);
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"securityStatuses":[]}"#)]);
         let client = test_client_with_auth(mock);
 
         client.security_status(&["XCME:ES.U16"]).await.unwrap();
@@ -729,9 +693,7 @@ mod tests {
 
     #[tokio::test]
     async fn exchange_sources_returns_list() {
-        let mock = MockHttp::new(vec![MockResponse::ok(
-            r#"{"exchanges":["XCME","XCBT"]}"#,
-        )]);
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"exchanges":["XCME","XCBT"]}"#)]);
         let client = test_client_with_auth(mock);
 
         let exchanges = client.exchange_sources().await.unwrap();
@@ -748,10 +710,7 @@ mod tests {
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
-        assert!(reqs[0]
-            .uri
-            .to_string()
-            .ends_with("/info/exchangeSources"));
+        assert!(reqs[0].uri.to_string().ends_with("/info/exchangeSources"));
     }
 
     // --- complexes ---
@@ -772,9 +731,7 @@ mod tests {
 
     #[tokio::test]
     async fn complexes_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(
-            r#"{"marketComplexes":[]}"#,
-        )]);
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"marketComplexes":[]}"#)]);
         let client = test_client_with_auth(mock);
 
         client.complexes("XCME").await.unwrap();
@@ -807,10 +764,12 @@ mod tests {
         client.futures_symbols("XCME", "ES").await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
-        assert!(reqs[0]
-            .uri
-            .to_string()
-            .ends_with("/info/symbol/search/futures/XCME/ES"));
+        assert!(
+            reqs[0]
+                .uri
+                .to_string()
+                .ends_with("/info/symbol/search/futures/XCME/ES")
+        );
     }
 
     // --- symbol_groups ---
@@ -836,10 +795,12 @@ mod tests {
         client.symbol_groups("Currency").await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
-        assert!(reqs[0]
-            .uri
-            .to_string()
-            .ends_with("/info/symbol/search/groups/Currency"));
+        assert!(
+            reqs[0]
+                .uri
+                .to_string()
+                .ends_with("/info/symbol/search/groups/Currency")
+        );
     }
 
     // --- option_groups ---
@@ -863,9 +824,7 @@ mod tests {
 
     #[tokio::test]
     async fn option_groups_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(
-            r#"{"groups":[],"optionGroups":[]}"#,
-        )]);
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"groups":[],"optionGroups":[]}"#)]);
         let client = test_client_with_auth(mock);
 
         client.option_groups("XCME:ES.U16").await.unwrap();

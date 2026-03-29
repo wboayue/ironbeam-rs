@@ -25,11 +25,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Trader info
     let trader = client.trader_info(None).await?;
-    println!("Trader: {:?}, accounts: {:?}", trader.trader_id, trader.accounts);
+    println!(
+        "Trader: {:?}, accounts: {:?}",
+        trader.trader_id, trader.accounts
+    );
 
     // User info
     let user = client.user_info(None).await?;
-    println!("User: {:?}, email: {:?}", user.account_title, user.email_address_1);
+    println!(
+        "User: {:?}, email: {:?}",
+        user.account_title, user.email_address_1
+    );
 
     // Exchanges
     let exchanges = client.exchange_sources().await?;
@@ -39,7 +45,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let futures = client.futures_symbols("CME", "ES").await?;
     println!("\nFutures for CME ES ({} contracts):", futures.len());
     for f in futures.iter().take(4) {
-        println!("  {} {:?} ({:?}/{:?})", f.symbol, f.description, f.maturity_month, f.maturity_year);
+        println!(
+            "  {} {:?} ({:?}/{:?})",
+            f.symbol, f.description, f.maturity_month, f.maturity_year
+        );
     }
 
     // Symbol search
