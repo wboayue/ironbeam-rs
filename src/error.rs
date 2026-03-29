@@ -11,10 +11,10 @@ struct ApiErrorBody {
 /// Extract a human-readable message from an API error JSON body.
 /// Checks top-level `error1`/`message` first, then nested `result`, then raw body.
 pub(crate) fn parse_api_error(body: &[u8]) -> String {
-    if let Ok(parsed) = serde_json::from_slice::<ApiErrorBody>(body) {
-        if let Some(msg) = extract_message(&parsed, 3) {
-            return msg;
-        }
+    if let Ok(parsed) = serde_json::from_slice::<ApiErrorBody>(body)
+        && let Some(msg) = extract_message(&parsed, 3)
+    {
+        return msg;
     }
     String::from_utf8_lossy(body).into_owned()
 }
@@ -26,10 +26,10 @@ fn extract_message(body: &ApiErrorBody, max_depth: u8) -> Option<String> {
     if let Some(m) = body.message.as_ref().filter(|s| !s.is_empty()) {
         return Some(m.clone());
     }
-    if max_depth > 0 {
-        if let Some(inner) = &body.result {
-            return extract_message(inner, max_depth - 1);
-        }
+    if max_depth > 0
+        && let Some(inner) = &body.result
+    {
+        return extract_message(inner, max_depth - 1);
     }
     None
 }
