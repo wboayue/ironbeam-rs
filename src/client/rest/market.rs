@@ -3,9 +3,7 @@ use time::OffsetDateTime;
 use crate::client::Client;
 use crate::client::http::HttpTransport;
 use crate::error::{Error, Result};
-use crate::types::{
-    Depth, DepthResponse, QuoteFull, QuotesResponse, Trade, TradesResponse,
-};
+use crate::types::{Depth, DepthResponse, QuoteFull, QuotesResponse, Trade, TradesResponse};
 
 impl<H: HttpTransport> Client<H> {
     /// Get quotes for symbols (max 10).

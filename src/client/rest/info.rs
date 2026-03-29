@@ -154,7 +154,9 @@ impl<H: HttpTransport> Client<H> {
     /// # }
     /// ```
     pub async fn security_definitions(&self, symbols: &[&str]) -> Result<Vec<SecurityDefinition>> {
-        let resp: SecurityDefinitionsResponse = self.symbol_query("/info/security/definitions", symbols).await?;
+        let resp: SecurityDefinitionsResponse = self
+            .symbol_query("/info/security/definitions", symbols)
+            .await?;
         Ok(resp.security_definitions)
     }
 
@@ -176,7 +178,8 @@ impl<H: HttpTransport> Client<H> {
     /// # }
     /// ```
     pub async fn security_margin(&self, symbols: &[&str]) -> Result<Vec<SecurityMarginAndValue>> {
-        let resp: SecurityMarginAndValueResponse = self.symbol_query("/info/security/margin", symbols).await?;
+        let resp: SecurityMarginAndValueResponse =
+            self.symbol_query("/info/security/margin", symbols).await?;
         Ok(resp.security_margin_and_values)
     }
 
@@ -198,7 +201,8 @@ impl<H: HttpTransport> Client<H> {
     /// # }
     /// ```
     pub async fn security_status(&self, symbols: &[&str]) -> Result<Vec<SecurityStatus>> {
-        let resp: SecurityStatusResponse = self.symbol_query("/info/security/status", symbols).await?;
+        let resp: SecurityStatusResponse =
+            self.symbol_query("/info/security/status", symbols).await?;
         Ok(resp.security_statuses)
     }
 
