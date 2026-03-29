@@ -373,25 +373,27 @@ pub enum ExchangeStrategyType {
     DN,
 }
 
-/// Security trading status (integer-encoded).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize_repr, Deserialize_repr)]
-#[repr(i32)]
-pub enum SecurityStatusType {
-    TradingHalt = 2,
-    Closed = 4,
-    PriceIndication = 15,
-    Open = 17,
-    Close = 18,
-    Unknown = 20,
-    PreOpen = 21,
-    OpeningRotation = 22,
-    PreCross = 24,
-    Cross = 25,
-    NoCancel = 26,
-    Expired = 30,
-    PreClose = 31,
-    NoChange = 103,
-    PostClose = 126,
+dual_format_enum! {
+    /// Security trading status.
+    ///
+    /// REST sends strings (`"CLOSED"`), streaming sends integers (`4`).
+    pub enum SecurityStatusType {
+        TradingHalt = (2, "TRADING_HALT"),
+        Closed = (4, "CLOSED"),
+        PriceIndication = (15, "PRICE_INDICATION"),
+        Open = (17, "OPEN"),
+        Close = (18, "CLOSE"),
+        Unknown = (20, "UNKNOWN"),
+        PreOpen = (21, "PRE_OPEN"),
+        OpeningRotation = (22, "OPENING_ROTATION"),
+        PreCross = (24, "PRE_CROSS"),
+        Cross = (25, "CROSS"),
+        NoCancel = (26, "NO_CANCEL"),
+        Expired = (30, "EXPIRED"),
+        PreClose = (31, "PRE_CLOSE"),
+        NoChange = (103, "NO_CHANGE"),
+        PostClose = (126, "POST_CLOSE"),
+    }
 }
 
 /// Aggressor side (integer-encoded).
@@ -459,7 +461,11 @@ mod tests {
     fn security_status_type_round_trip() {
         assert_eq!(
             serde_json::to_string(&SecurityStatusType::Open).unwrap(),
-            "17"
+            r#""OPEN""#
+        );
+        assert_eq!(
+            serde_json::from_str::<SecurityStatusType>(r#""CLOSED""#).unwrap(),
+            SecurityStatusType::Closed
         );
         assert_eq!(
             serde_json::from_str::<SecurityStatusType>("17").unwrap(),

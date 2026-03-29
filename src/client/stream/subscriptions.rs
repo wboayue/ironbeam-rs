@@ -127,6 +127,7 @@ mod tests {
             http: mock,
             base_url: "http://test".into(),
             auth_headers: headers,
+            rate_limiter: None,
         }
     }
 

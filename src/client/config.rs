@@ -4,6 +4,7 @@ use hyper::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 
 use crate::error::{Error, Result};
 
+use super::rate_limiter::RateLimiter;
 use super::rest::auth;
 use super::{Client, RequestHelper, http::HttpClient};
 
@@ -35,6 +36,7 @@ impl std::fmt::Debug for Credentials {
 pub struct ClientBuilder {
     base_url: String,
     credentials: Option<Credentials>,
+    max_requests_per_sec: Option<u32>,
 }
 
 impl ClientBuilder {
@@ -42,6 +44,7 @@ impl ClientBuilder {
         Self {
             base_url: DEMO_BASE_URL.to_owned(),
             credentials: None,
+            max_requests_per_sec: None,
         }
     }
 
@@ -73,6 +76,16 @@ impl ClientBuilder {
         self
     }
 
+    /// Limit outgoing requests to `max_per_sec` per second.
+    ///
+    /// The Ironbeam API allows 10 requests/sec. Use a value like 8 to stay
+    /// safely under the limit.
+    #[must_use]
+    pub fn rate_limit(mut self, max_per_sec: u32) -> Self {
+        self.max_requests_per_sec = Some(max_per_sec);
+        self
+    }
+
     /// Authenticate and return a connected [`Client`].
     pub async fn connect(self) -> Result<Client> {
         let credentials = self
@@ -93,11 +106,14 @@ impl ClientBuilder {
             .map_err(|e| Error::Other(e.to_string()))?;
         auth_headers.insert(AUTHORIZATION, value);
 
+        let rate_limiter = self.max_requests_per_sec.map(RateLimiter::new);
+
         Ok(Client {
             request: RequestHelper {
                 http,
                 base_url: self.base_url,
                 auth_headers,
+                rate_limiter,
             },
             is_logged_out: AtomicBool::new(false),
         })

@@ -1,10 +1,12 @@
 mod config;
 mod http;
+pub(crate) mod rate_limiter;
 pub(crate) mod rest;
 pub mod stream;
 
 pub use config::{ClientBuilder, Credentials};
 pub use http::HttpTransport;
+pub use rest::SymbolSearchParams;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -15,6 +17,7 @@ use serde::de::DeserializeOwned;
 
 use crate::error::{Error, Result, parse_api_error};
 use http::HttpClient;
+use rate_limiter::RateLimiter;
 
 // ---------------------------------------------------------------------------
 // RequestHelper — shared HTTP request logic
@@ -28,6 +31,7 @@ pub(crate) struct RequestHelper<H: HttpTransport> {
     pub(crate) base_url: String,
     /// Cached authorization headers. Contains the bearer token — do not log.
     pub(crate) auth_headers: HeaderMap,
+    pub(crate) rate_limiter: Option<RateLimiter>,
 }
 
 impl<H: HttpTransport> RequestHelper<H> {
@@ -38,6 +42,10 @@ impl<H: HttpTransport> RequestHelper<H> {
         path: &str,
         body: Option<Bytes>,
     ) -> Result<T> {
+        if let Some(limiter) = &self.rate_limiter {
+            limiter.wait().await;
+        }
+
         let uri = format!("{}{path}", self.base_url).parse()?;
 
         let (status, resp_body) = if body.is_some() {
@@ -215,6 +223,7 @@ pub(crate) mod test_support {
                 base_url: "http://test".into(),
                 auth_headers: HeaderMap::new(),
                 http: mock,
+                rate_limiter: None,
             },
             is_logged_out: AtomicBool::new(false),
         }
@@ -229,6 +238,7 @@ pub(crate) mod test_support {
                 base_url: "http://test".into(),
                 auth_headers: headers,
                 http: mock,
+                rate_limiter: None,
             },
             is_logged_out: AtomicBool::new(false),
         }
