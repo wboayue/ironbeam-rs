@@ -15,6 +15,12 @@ Documentation in `specs/`. Start with `specs/README.md` for auth pattern, stream
 - `specs/simulation.md` — demo-only simulated trader/account management
 - `specs/types.md` — all enums, type aliases, and data structures
 
+## API Spec Caveats
+
+- `specs/openapi.json` is underspecified: only `Balance` and `Order` declare `required` fields. All other schemas (17+) omit `required` entirely, making every field technically optional per OpenAPI.
+- Use domain logic to determine required fields, not the schema. Key identifiers (`accountId`, `exchSym`, `traderId`, `symbol`, `orderId`) are always present and should be non-optional in Rust types.
+- The spec also has known field name mismatches vs the live API (e.g., `StrategyIdResponse` spec says PascalCase, live returns lowercase; `SecurityStatusType` spec says integer-only, live REST returns strings). Use `alias` or dual-format enums to handle both.
+
 ## API Rate Limit
 
 - Hard limit of **10 requests per second** (sliding window). Auth and logout count toward this limit.

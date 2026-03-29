@@ -11,12 +11,12 @@ pub struct TraderInfo {
     pub accounts: Vec<String>,
 
     /// Whether this is a live (not demo) account.
-    #[serde(rename = "isLive", default)]
-    pub is_live: Option<bool>,
+    #[serde(rename = "isLive")]
+    pub is_live: bool,
 
     /// Trader identifier.
-    #[serde(rename = "traderId", default)]
-    pub trader_id: Option<String>,
+    #[serde(rename = "traderId")]
+    pub trader_id: String,
 }
 
 /// User general information.
@@ -179,7 +179,7 @@ mod tests {
         let json = r#"{"accounts":["ACC001","ACC002"],"isLive":true,"traderId":"T001"}"#;
         let t: TraderInfo = serde_json::from_str(json).unwrap();
         assert_eq!(t.accounts.len(), 2);
-        assert_eq!(t.is_live, Some(true));
+        assert_eq!(t.is_live, true);
     }
 
     #[test]

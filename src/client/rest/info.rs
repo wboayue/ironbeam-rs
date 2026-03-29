@@ -487,14 +487,14 @@ mod tests {
         let info = client.trader_info(None).await.unwrap();
 
         assert_eq!(info.accounts, vec!["ACC1"]);
-        assert_eq!(info.is_live, Some(true));
-        assert_eq!(info.trader_id.as_deref(), Some("T1"));
+        assert_eq!(info.is_live, true);
+        assert_eq!(info.trader_id, "T1");
     }
 
     #[tokio::test]
     async fn trader_info_sends_correct_uri() {
         let mock = MockHttp::new(vec![MockResponse::ok(
-            r#"{"accounts":[]}"#,
+            r#"{"accounts":[],"isLive":false,"traderId":"T1"}"#,
         )]);
         let client = test_client_with_auth(mock);
 
@@ -508,7 +508,7 @@ mod tests {
     #[tokio::test]
     async fn trader_info_with_trader_id() {
         let mock = MockHttp::new(vec![MockResponse::ok(
-            r#"{"accounts":["ACC1"],"traderId":"T1"}"#,
+            r#"{"accounts":["ACC1"],"isLive":true,"traderId":"T1"}"#,
         )]);
         let client = test_client_with_auth(mock);
 
