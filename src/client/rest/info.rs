@@ -25,7 +25,7 @@ use crate::types::{
 /// use ironbeam_rs::client::SymbolSearchParams;
 ///
 /// let params = SymbolSearchParams::new()
-///     .text("ES")
+///     .text("GOLD")
 ///     .limit(10)
 ///     .prefer_active(true);
 /// ```
@@ -243,7 +243,7 @@ impl<H: HttpTransport> Client<H> {
     /// # let client = Client::builder()
     /// #     .credentials(Credentials { username: "u".into(), password: "p".into(), api_key: "k".into() })
     /// #     .connect().await?;
-    /// let params = SymbolSearchParams::new().text("ES").limit(5);
+    /// let params = SymbolSearchParams::new().text("GOLD").limit(5);
     /// let symbols = client.symbols(&params).await?;
     /// for s in &symbols {
     ///     println!("{}: {:?}", s.symbol, s.description);
