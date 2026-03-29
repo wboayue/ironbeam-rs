@@ -570,6 +570,23 @@ mod tests {
         assert_eq!(body["limitPrice"], 4500.0);
     }
 
+    #[tokio::test]
+    async fn place_order_omits_unset_optional_fields() {
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"orderId":"ORD001"}"#)]);
+        let client = test_client_with_auth(mock);
+
+        let order = OrderBuilder::market("XCME:ES.U16", OrderSide::Buy, 1.0, DurationType::Day);
+        client.place_order("ACC1", &order).await.unwrap();
+
+        let reqs = client.request.http.recorded_requests();
+        let body: serde_json::Value = serde_json::from_slice(&reqs[0].body).unwrap();
+        assert!(body.get("limitPrice").is_none());
+        assert!(body.get("stopPrice").is_none());
+        assert!(body.get("stopLoss").is_none());
+        assert!(body.get("takeProfit").is_none());
+        assert!(body.get("waitForOrderId").is_none());
+    }
+
     // --- update_order ---
 
     #[tokio::test]
@@ -591,8 +608,13 @@ mod tests {
         let mock = MockHttp::new(vec![MockResponse::ok(r#"{"orders":[]}"#)]);
         let client = test_client_with_auth(mock);
 
-        let update = OrderUpdate::new(5);
-        client.update_order("ACC1", "ORD001", &update).await.unwrap();
+        let mut update = OrderUpdate::new(5);
+        update.limit_price = Some(4600.0);
+        update.stop_price = Some(4400.0);
+        client
+            .update_order("ACC1", "ORD001", &update)
+            .await
+            .unwrap();
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::PUT);
@@ -603,6 +625,8 @@ mod tests {
         let body: serde_json::Value = serde_json::from_slice(&reqs[0].body).unwrap();
         assert_eq!(body["orderId"], "ORD001");
         assert_eq!(body["quantity"], 5);
+        assert_eq!(body["limitPrice"], 4600.0);
+        assert_eq!(body["stopPrice"], 4400.0);
     }
 
     // --- cancel_order ---
