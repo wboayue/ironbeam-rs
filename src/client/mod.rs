@@ -6,7 +6,7 @@ pub mod stream;
 
 pub use config::{ClientBuilder, Credentials};
 pub use http::HttpTransport;
-pub use rest::SymbolSearchParams;
+pub use rest::{OrderBuilder, OrderUpdate, SymbolSearchParams};
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -157,6 +157,10 @@ impl Client {
 impl<H: HttpTransport> Client<H> {
     pub(crate) async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
         self.request.get(path).await
+    }
+
+    pub(crate) async fn delete<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
+        self.request.delete(path).await
     }
 
     /// GET `{path}?symbols=` with validation (non-empty, max 10) and URL encoding.
