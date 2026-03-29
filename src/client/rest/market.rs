@@ -103,9 +103,17 @@ mod tests {
     use hyper::StatusCode;
     use hyper::header::AUTHORIZATION;
 
+    use time::OffsetDateTime;
+
     use crate::client::http::mock::{MockHttp, MockResponse};
     use crate::client::test_support::test_client_with_auth;
     use crate::error::Error;
+
+    fn test_time_range() -> (OffsetDateTime, OffsetDateTime) {
+        let from = OffsetDateTime::from_unix_timestamp(1700000000).unwrap();
+        let to = OffsetDateTime::from_unix_timestamp(1700003600).unwrap();
+        (from, to)
+    }
 
     // --- quotes ---
 
@@ -128,13 +136,17 @@ mod tests {
         let mock = MockHttp::new(vec![MockResponse::ok(r#"{"Quotes":[]}"#)]);
         let client = test_client_with_auth(mock);
 
-        client.quotes(&["XCME:ES.U16"]).await.unwrap();
+        client
+            .quotes(&["XCME:ES.U16", "XCME:NQ.U16"])
+            .await
+            .unwrap();
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
         let uri = reqs[0].uri.to_string();
         assert!(uri.contains("/market/quotes?symbols="));
         assert!(uri.contains("XCME%3AES.U16"));
+        assert!(uri.contains("XCME%3ANQ.U16"));
     }
 
     #[tokio::test]
@@ -176,6 +188,15 @@ mod tests {
         assert!(uri.contains("/market/depth?symbols="));
     }
 
+    #[tokio::test]
+    async fn depth_rejects_empty_symbols() {
+        let mock = MockHttp::new(vec![]);
+        let client = test_client_with_auth(mock);
+
+        let err = client.depth(&[]).await.unwrap_err();
+        assert!(matches!(err, Error::Other(msg) if msg.contains("empty")));
+    }
+
     // --- trades ---
 
     #[tokio::test]
@@ -185,8 +206,7 @@ mod tests {
         )]);
         let client = test_client_with_auth(mock);
 
-        let from = time::OffsetDateTime::from_unix_timestamp(1700000000).unwrap();
-        let to = time::OffsetDateTime::from_unix_timestamp(1700003600).unwrap();
+        let (from, to) = test_time_range();
         let trades = client
             .trades("XCME:ES.U16", from, to, 50, true)
             .await
@@ -202,8 +222,7 @@ mod tests {
         let mock = MockHttp::new(vec![MockResponse::ok(r#"{"traders":[]}"#)]);
         let client = test_client_with_auth(mock);
 
-        let from = time::OffsetDateTime::from_unix_timestamp(1700000000).unwrap();
-        let to = time::OffsetDateTime::from_unix_timestamp(1700003600).unwrap();
+        let (from, to) = test_time_range();
         client
             .trades("XCME:ES.U16", from, to, 10, false)
             .await
@@ -220,8 +239,7 @@ mod tests {
         let mock = MockHttp::new(vec![]);
         let client = test_client_with_auth(mock);
 
-        let from = time::OffsetDateTime::from_unix_timestamp(1700000000).unwrap();
-        let to = time::OffsetDateTime::from_unix_timestamp(1700003600).unwrap();
+        let (from, to) = test_time_range();
         let err = client
             .trades("XCME:ES.U16", from, to, 0, true)
             .await
@@ -234,8 +252,7 @@ mod tests {
         let mock = MockHttp::new(vec![]);
         let client = test_client_with_auth(mock);
 
-        let from = time::OffsetDateTime::from_unix_timestamp(1700000000).unwrap();
-        let to = time::OffsetDateTime::from_unix_timestamp(1700003600).unwrap();
+        let (from, to) = test_time_range();
         let err = client
             .trades("XCME:ES.U16", from, to, 101, true)
             .await
