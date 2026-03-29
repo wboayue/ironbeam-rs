@@ -50,7 +50,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Historical trades
     let now = time::OffsetDateTime::now_utc();
-    let hour_ago = now - time::Duration::hours(1);
+    let hour_ago = now - time::Duration::HOUR;
     let trades = client.trades(symbol, hour_ago, now, 10, true).await?;
     println!("\nTrades for {symbol} (last hour): {} trade(s)", trades.len());
     for t in &trades {

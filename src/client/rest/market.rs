@@ -68,7 +68,7 @@ impl<H: HttpTransport> Client<H> {
     /// #     .credentials(Credentials { username: "u".into(), password: "p".into(), api_key: "k".into() })
     /// #     .connect().await?;
     /// let now = time::OffsetDateTime::now_utc();
-    /// let hour_ago = now - time::Duration::hours(1);
+    /// let hour_ago = now - time::Duration::HOUR;
     /// let trades = client.trades("XCME:ES.U16", hour_ago, now, 50, true).await?;
     /// for t in &trades {
     ///     println!("{}: {:?} @ {:?}", t.symbol, t.size, t.price);
