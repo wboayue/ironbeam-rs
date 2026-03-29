@@ -7,3 +7,4 @@ mod simulation;
 
 pub use info::SymbolSearchParams;
 pub use orders::{OrderBuilder, OrderUpdate};
+pub use simulation::{LiquidateBuilder, RiskBuilder};

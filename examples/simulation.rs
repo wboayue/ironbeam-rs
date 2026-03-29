@@ -2,10 +2,7 @@ use std::env;
 use std::error::Error;
 
 use ironbeam_rs::client::{Client, Credentials};
-use ironbeam_rs::types::{
-    SimulatedAccountAddCashRequest, SimulatedAccountExpireRequest, SimulatedAccountResetRequest,
-    SimulatedTraderAddAccountRequest, SimulatedTraderCreateRequest,
-};
+use ironbeam_rs::types::SimulatedTraderCreateRequest;
 
 /// Simulated account management workflow (demo only, enterprise feature).
 ///
@@ -48,21 +45,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // 2. Add an account to the trader
     let account_id = client
-        .simulated_account_add(&SimulatedTraderAddAccountRequest {
-            trader_id: trader_id.clone(),
-            password: "demo_password".into(),
-            template_id: "XAP50".into(),
-        })
+        .simulated_account_add(&trader_id, "demo_password", "XAP50")
         .await?;
     println!("Added account: {account_id}");
 
     // 3. Add cash to the account
-    client
-        .simulated_account_add_cash(&SimulatedAccountAddCashRequest {
-            account_id: account_id.clone(),
-            amount: 25_000.0,
-        })
-        .await?;
+    client.simulated_account_add_cash(&account_id, 25_000.0).await?;
     println!("Added $25,000 to {account_id}");
 
     // 4. Get cash report
@@ -77,20 +65,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // 5. Reset the account
-    client
-        .simulated_account_reset(&SimulatedAccountResetRequest {
-            account_id: account_id.clone(),
-            template_id: "XAP100".into(),
-        })
-        .await?;
+    client.simulated_account_reset(&account_id, "XAP100").await?;
     println!("Reset {account_id}");
 
     // 6. Expire the account
-    client
-        .simulated_account_expire(&SimulatedAccountExpireRequest {
-            account_id: account_id.clone(),
-        })
-        .await?;
+    client.simulated_account_expire(&account_id).await?;
     println!("Expired {account_id}");
 
     client.logout().await?;
