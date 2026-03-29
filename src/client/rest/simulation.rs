@@ -11,6 +11,273 @@ use crate::types::{
     SimulatedTraderAddAccountResponse, SimulatedTraderCreateRequest, SimulatedTraderCreateResponse,
 };
 
+// ---------------------------------------------------------------------------
+// LiquidateBuilder — ergonomic liquidation request
+// ---------------------------------------------------------------------------
+
+/// Builder for simulated account liquidation requests.
+///
+/// # Example
+///
+/// ```
+/// use ironbeam_rs::client::LiquidateBuilder;
+///
+/// let req = LiquidateBuilder::new()
+///     .accounts(&["ACC001", "ACC002"])
+///     .force_manual(true);
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct LiquidateBuilder {
+    accounts: Option<Vec<String>>,
+    groups: Option<Vec<String>>,
+    except_accounts: Option<Vec<String>>,
+    force_manual_liquidation: Option<bool>,
+    use_manual_liquidation_for_illiquid_markets: Option<bool>,
+    send_account_email: Option<bool>,
+    send_office_email: Option<bool>,
+}
+
+impl LiquidateBuilder {
+    /// Create an empty liquidation request.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Accounts to liquidate.
+    #[must_use]
+    pub fn accounts(mut self, accounts: &[&str]) -> Self {
+        self.accounts = Some(accounts.iter().map(|s| s.to_string()).collect());
+        self
+    }
+
+    /// Groups to liquidate.
+    #[must_use]
+    pub fn groups(mut self, groups: &[&str]) -> Self {
+        self.groups = Some(groups.iter().map(|s| s.to_string()).collect());
+        self
+    }
+
+    /// Accounts to exclude from liquidation.
+    #[must_use]
+    pub fn except_accounts(mut self, accounts: &[&str]) -> Self {
+        self.except_accounts = Some(accounts.iter().map(|s| s.to_string()).collect());
+        self
+    }
+
+    /// Force manual liquidation.
+    #[must_use]
+    pub fn force_manual(mut self, force: bool) -> Self {
+        self.force_manual_liquidation = Some(force);
+        self
+    }
+
+    /// Use manual liquidation for illiquid markets.
+    #[must_use]
+    pub fn manual_for_illiquid(mut self, manual: bool) -> Self {
+        self.use_manual_liquidation_for_illiquid_markets = Some(manual);
+        self
+    }
+
+    /// Send email to account holder.
+    #[must_use]
+    pub fn send_account_email(mut self, send: bool) -> Self {
+        self.send_account_email = Some(send);
+        self
+    }
+
+    /// Send email to office.
+    #[must_use]
+    pub fn send_office_email(mut self, send: bool) -> Self {
+        self.send_office_email = Some(send);
+        self
+    }
+
+    fn to_request(&self) -> SimulatedAccountLiquidateRequest {
+        SimulatedAccountLiquidateRequest {
+            accounts: self.accounts.clone(),
+            groups: self.groups.clone(),
+            except_accounts: self.except_accounts.clone(),
+            force_manual_liquidation: self.force_manual_liquidation,
+            use_manual_liquidation_for_illiquid_markets: self
+                .use_manual_liquidation_for_illiquid_markets,
+            send_account_email: self.send_account_email,
+            send_office_email: self.send_office_email,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RiskBuilder — ergonomic risk parameter setup
+// ---------------------------------------------------------------------------
+
+/// Builder for simulated account risk parameters.
+///
+/// # Example
+///
+/// ```
+/// use ironbeam_rs::client::RiskBuilder;
+///
+/// let risk = RiskBuilder::new("ACC001")
+///     .liquidation_account_value(25_000.0)
+///     .reduce_positions_only(true);
+/// ```
+#[derive(Debug, Clone)]
+pub struct RiskBuilder {
+    account_id: String,
+    liquidation_account_value: Option<f64>,
+    liquidation_loss_from_start_of_day: Option<f64>,
+    liquidation_loss_from_high_of_day: Option<f64>,
+    liquidation_loss_from_high_of_multiday: Option<f64>,
+    liquidation_pct_loss_from_start_of_day: Option<f64>,
+    liquidation_pct_loss_from_high_of_day: Option<f64>,
+    liquidation_pct_loss_from_high_of_multiday: Option<f64>,
+    liquidation_pct_margin_deficiency: Option<f64>,
+    liquidation_max_value_override: Option<f64>,
+    reduce_positions_only: Option<bool>,
+    restore_trading: Option<bool>,
+    margin_schedule_name: Option<String>,
+    template_id: Option<String>,
+}
+
+impl RiskBuilder {
+    /// Create a risk builder for the given account.
+    #[must_use]
+    pub fn new(account_id: impl Into<String>) -> Self {
+        Self {
+            account_id: account_id.into(),
+            liquidation_account_value: None,
+            liquidation_loss_from_start_of_day: None,
+            liquidation_loss_from_high_of_day: None,
+            liquidation_loss_from_high_of_multiday: None,
+            liquidation_pct_loss_from_start_of_day: None,
+            liquidation_pct_loss_from_high_of_day: None,
+            liquidation_pct_loss_from_high_of_multiday: None,
+            liquidation_pct_margin_deficiency: None,
+            liquidation_max_value_override: None,
+            reduce_positions_only: None,
+            restore_trading: None,
+            margin_schedule_name: None,
+            template_id: None,
+        }
+    }
+
+    /// Liquidation account value threshold.
+    #[must_use]
+    pub fn liquidation_account_value(mut self, value: f64) -> Self {
+        self.liquidation_account_value = Some(value);
+        self
+    }
+
+    /// Liquidation loss from start of day.
+    #[must_use]
+    pub fn liquidation_loss_from_start_of_day(mut self, value: f64) -> Self {
+        self.liquidation_loss_from_start_of_day = Some(value);
+        self
+    }
+
+    /// Liquidation loss from high of day.
+    #[must_use]
+    pub fn liquidation_loss_from_high_of_day(mut self, value: f64) -> Self {
+        self.liquidation_loss_from_high_of_day = Some(value);
+        self
+    }
+
+    /// Liquidation loss from high of multiday.
+    #[must_use]
+    pub fn liquidation_loss_from_high_of_multiday(mut self, value: f64) -> Self {
+        self.liquidation_loss_from_high_of_multiday = Some(value);
+        self
+    }
+
+    /// Liquidation percentage loss from start of day.
+    #[must_use]
+    pub fn liquidation_pct_loss_from_start_of_day(mut self, value: f64) -> Self {
+        self.liquidation_pct_loss_from_start_of_day = Some(value);
+        self
+    }
+
+    /// Liquidation percentage loss from high of day.
+    #[must_use]
+    pub fn liquidation_pct_loss_from_high_of_day(mut self, value: f64) -> Self {
+        self.liquidation_pct_loss_from_high_of_day = Some(value);
+        self
+    }
+
+    /// Liquidation percentage loss from high of multiday.
+    #[must_use]
+    pub fn liquidation_pct_loss_from_high_of_multiday(mut self, value: f64) -> Self {
+        self.liquidation_pct_loss_from_high_of_multiday = Some(value);
+        self
+    }
+
+    /// Liquidation percentage margin deficiency.
+    #[must_use]
+    pub fn liquidation_pct_margin_deficiency(mut self, value: f64) -> Self {
+        self.liquidation_pct_margin_deficiency = Some(value);
+        self
+    }
+
+    /// Override maximum account value limit.
+    #[must_use]
+    pub fn liquidation_max_value_override(mut self, value: f64) -> Self {
+        self.liquidation_max_value_override = Some(value);
+        self
+    }
+
+    /// Only reduce positions, don't flatten.
+    #[must_use]
+    pub fn reduce_positions_only(mut self, reduce: bool) -> Self {
+        self.reduce_positions_only = Some(reduce);
+        self
+    }
+
+    /// Restore trading after liquidation.
+    #[must_use]
+    pub fn restore_trading(mut self, restore: bool) -> Self {
+        self.restore_trading = Some(restore);
+        self
+    }
+
+    /// Margin schedule name.
+    #[must_use]
+    pub fn margin_schedule_name(mut self, name: impl Into<String>) -> Self {
+        self.margin_schedule_name = Some(name.into());
+        self
+    }
+
+    /// Template ID.
+    #[must_use]
+    pub fn template_id(mut self, id: impl Into<String>) -> Self {
+        self.template_id = Some(id.into());
+        self
+    }
+
+    fn to_request(&self) -> SimulatedAccountSetRiskRequest {
+        SimulatedAccountSetRiskRequest {
+            account_id: self.account_id.clone(),
+            liquidation_account_value: self.liquidation_account_value,
+            liquidation_loss_from_start_of_day: self.liquidation_loss_from_start_of_day,
+            liquidation_loss_from_high_of_day: self.liquidation_loss_from_high_of_day,
+            liquidation_loss_from_high_of_multiday: self.liquidation_loss_from_high_of_multiday,
+            liquidation_pct_loss_from_start_of_day: self.liquidation_pct_loss_from_start_of_day,
+            liquidation_pct_loss_from_high_of_day: self.liquidation_pct_loss_from_high_of_day,
+            liquidation_pct_loss_from_high_of_multiday: self
+                .liquidation_pct_loss_from_high_of_multiday,
+            liquidation_pct_margin_deficiency: self.liquidation_pct_margin_deficiency,
+            liquidation_max_value_override: self.liquidation_max_value_override,
+            reduce_positions_only: self.reduce_positions_only,
+            restore_trading: self.restore_trading,
+            margin_schedule_name: self.margin_schedule_name.clone(),
+            template_id: self.template_id.clone(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Client methods
+// ---------------------------------------------------------------------------
+
 impl<H: HttpTransport> Client<H> {
     /// Create a simulated trader (demo only, enterprise feature).
     ///
@@ -60,26 +327,28 @@ impl<H: HttpTransport> Client<H> {
     ///
     /// ```no_run
     /// # use ironbeam_rs::client::{Client, Credentials};
-    /// # use ironbeam_rs::types::SimulatedTraderAddAccountRequest;
     /// # async fn example() -> ironbeam_rs::error::Result<()> {
     /// # let client = Client::builder()
     /// #     .credentials(Credentials { username: "u".into(), password: "p".into(), api_key: "k".into() })
     /// #     .demo().connect().await?;
-    /// let account_id = client.simulated_account_add(&SimulatedTraderAddAccountRequest {
-    ///     trader_id: "T123".into(),
-    ///     password: "secret".into(),
-    ///     template_id: "XAP50".into(),
-    /// }).await?;
+    /// let account_id = client.simulated_account_add("T123", "secret", "XAP50").await?;
     /// println!("Account ID: {account_id}");
     /// # Ok(())
     /// # }
     /// ```
     pub async fn simulated_account_add(
         &self,
-        request: &SimulatedTraderAddAccountRequest,
+        trader_id: &str,
+        password: &str,
+        template_id: &str,
     ) -> Result<String> {
+        let req = SimulatedTraderAddAccountRequest {
+            trader_id: trader_id.to_string(),
+            password: password.to_string(),
+            template_id: template_id.to_string(),
+        };
         let resp: SimulatedTraderAddAccountResponse =
-            self.post("/simulatedAccountAdd", request).await?;
+            self.post("/simulatedAccountAdd", &req).await?;
         Ok(resp.account_id)
     }
 
@@ -89,23 +358,24 @@ impl<H: HttpTransport> Client<H> {
     ///
     /// ```no_run
     /// # use ironbeam_rs::client::{Client, Credentials};
-    /// # use ironbeam_rs::types::SimulatedAccountResetRequest;
     /// # async fn example() -> ironbeam_rs::error::Result<()> {
     /// # let client = Client::builder()
     /// #     .credentials(Credentials { username: "u".into(), password: "p".into(), api_key: "k".into() })
     /// #     .demo().connect().await?;
-    /// client.simulated_account_reset(&SimulatedAccountResetRequest {
-    ///     account_id: "ACC001".into(),
-    ///     template_id: "XAP100".into(),
-    /// }).await?;
+    /// client.simulated_account_reset("ACC001", "XAP100").await?;
     /// # Ok(())
     /// # }
     /// ```
     pub async fn simulated_account_reset(
         &self,
-        request: &SimulatedAccountResetRequest,
+        account_id: &str,
+        template_id: &str,
     ) -> Result<Response> {
-        self.put("/simulatedAccountReset", request).await
+        let req = SimulatedAccountResetRequest {
+            account_id: account_id.to_string(),
+            template_id: template_id.to_string(),
+        };
+        self.put("/simulatedAccountReset", &req).await
     }
 
     /// Expire a simulated account (demo only).
@@ -114,23 +384,19 @@ impl<H: HttpTransport> Client<H> {
     ///
     /// ```no_run
     /// # use ironbeam_rs::client::{Client, Credentials};
-    /// # use ironbeam_rs::types::SimulatedAccountExpireRequest;
     /// # async fn example() -> ironbeam_rs::error::Result<()> {
     /// # let client = Client::builder()
     /// #     .credentials(Credentials { username: "u".into(), password: "p".into(), api_key: "k".into() })
     /// #     .demo().connect().await?;
-    /// client.simulated_account_expire(&SimulatedAccountExpireRequest {
-    ///     account_id: "ACC001".into(),
-    /// }).await?;
+    /// client.simulated_account_expire("ACC001").await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn simulated_account_expire(
-        &self,
-        request: &SimulatedAccountExpireRequest,
-    ) -> Result<Response> {
-        self.delete_with_body("/simulatedAccountExpire", request)
-            .await
+    pub async fn simulated_account_expire(&self, account_id: &str) -> Result<Response> {
+        let req = SimulatedAccountExpireRequest {
+            account_id: account_id.to_string(),
+        };
+        self.delete_with_body("/simulatedAccountExpire", &req).await
     }
 
     /// Add cash to a simulated account (demo only).
@@ -139,28 +405,27 @@ impl<H: HttpTransport> Client<H> {
     ///
     /// ```no_run
     /// # use ironbeam_rs::client::{Client, Credentials};
-    /// # use ironbeam_rs::types::SimulatedAccountAddCashRequest;
     /// # async fn example() -> ironbeam_rs::error::Result<()> {
     /// # let client = Client::builder()
     /// #     .credentials(Credentials { username: "u".into(), password: "p".into(), api_key: "k".into() })
     /// #     .demo().connect().await?;
-    /// client.simulated_account_add_cash(&SimulatedAccountAddCashRequest {
-    ///     account_id: "ACC001".into(),
-    ///     amount: 10_000.0,
-    /// }).await?;
+    /// client.simulated_account_add_cash("ACC001", 10_000.0).await?;
     /// # Ok(())
     /// # }
     /// ```
     pub async fn simulated_account_add_cash(
         &self,
-        request: &SimulatedAccountAddCashRequest,
+        account_id: &str,
+        amount: f32,
     ) -> Result<Response> {
-        self.post("/simulatedAccount/addCash", request).await
+        let req = SimulatedAccountAddCashRequest {
+            account_id: account_id.to_string(),
+            amount,
+        };
+        self.post("/simulatedAccount/addCash", &req).await
     }
 
     /// Get the cash report for a simulated account (demo only).
-    ///
-    /// Dates are formatted as YYYYMMDD strings in the query string.
     ///
     /// # Example
     ///
@@ -203,29 +468,24 @@ impl<H: HttpTransport> Client<H> {
     /// # Example
     ///
     /// ```no_run
-    /// # use ironbeam_rs::client::{Client, Credentials};
-    /// # use ironbeam_rs::types::SimulatedAccountLiquidateRequest;
+    /// # use ironbeam_rs::client::{Client, Credentials, LiquidateBuilder};
     /// # async fn example() -> ironbeam_rs::error::Result<()> {
     /// # let client = Client::builder()
     /// #     .credentials(Credentials { username: "u".into(), password: "p".into(), api_key: "k".into() })
     /// #     .demo().connect().await?;
-    /// client.simulated_account_liquidate(&SimulatedAccountLiquidateRequest {
-    ///     accounts: Some(vec!["ACC001".into()]),
-    ///     groups: None,
-    ///     except_accounts: None,
-    ///     force_manual_liquidation: None,
-    ///     use_manual_liquidation_for_illiquid_markets: None,
-    ///     send_account_email: None,
-    ///     send_office_email: None,
-    /// }).await?;
+    /// let req = LiquidateBuilder::new()
+    ///     .accounts(&["ACC001"])
+    ///     .force_manual(true);
+    /// client.simulated_account_liquidate(&req).await?;
     /// # Ok(())
     /// # }
     /// ```
     pub async fn simulated_account_liquidate(
         &self,
-        request: &SimulatedAccountLiquidateRequest,
+        builder: &LiquidateBuilder,
     ) -> Result<Response> {
-        self.post("/simulatedAccount/liquidate", request).await
+        let req = builder.to_request();
+        self.post("/simulatedAccount/liquidate", &req).await
     }
 
     /// Set risk parameters for a simulated account (demo only).
@@ -233,36 +493,20 @@ impl<H: HttpTransport> Client<H> {
     /// # Example
     ///
     /// ```no_run
-    /// # use ironbeam_rs::client::{Client, Credentials};
-    /// # use ironbeam_rs::types::SimulatedAccountSetRiskRequest;
+    /// # use ironbeam_rs::client::{Client, Credentials, RiskBuilder};
     /// # async fn example() -> ironbeam_rs::error::Result<()> {
     /// # let client = Client::builder()
     /// #     .credentials(Credentials { username: "u".into(), password: "p".into(), api_key: "k".into() })
     /// #     .demo().connect().await?;
-    /// client.simulated_account_set_risk(&SimulatedAccountSetRiskRequest {
-    ///     account_id: "ACC001".into(),
-    ///     liquidation_account_value: Some(25_000.0),
-    ///     liquidation_loss_from_start_of_day: None,
-    ///     liquidation_loss_from_high_of_day: None,
-    ///     liquidation_loss_from_high_of_multiday: None,
-    ///     liquidation_pct_loss_from_start_of_day: None,
-    ///     liquidation_pct_loss_from_high_of_day: None,
-    ///     liquidation_pct_loss_from_high_of_multiday: None,
-    ///     liquidation_pct_margin_deficiency: None,
-    ///     liquidation_max_value_override: None,
-    ///     reduce_positions_only: None,
-    ///     restore_trading: None,
-    ///     margin_schedule_name: None,
-    ///     template_id: None,
-    /// }).await?;
+    /// let risk = RiskBuilder::new("ACC001")
+    ///     .liquidation_account_value(25_000.0);
+    /// client.simulated_account_set_risk(&risk).await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn simulated_account_set_risk(
-        &self,
-        request: &SimulatedAccountSetRiskRequest,
-    ) -> Result<Response> {
-        self.post("/simulatedAccount/setRisk", request).await
+    pub async fn simulated_account_set_risk(&self, builder: &RiskBuilder) -> Result<Response> {
+        let req = builder.to_request();
+        self.post("/simulatedAccount/setRisk", &req).await
     }
 }
 
@@ -276,6 +520,8 @@ mod tests {
     use crate::client::test_support::test_client_with_auth;
     use crate::error::Error;
     use crate::types::*;
+
+    use super::{LiquidateBuilder, RiskBuilder};
 
     fn dummy_trader_create() -> SimulatedTraderCreateRequest {
         SimulatedTraderCreateRequest {
@@ -347,18 +593,20 @@ mod tests {
         let mock = MockHttp::new(vec![MockResponse::ok(r#"{"AccountId":"ACC001"}"#)]);
         let client = test_client_with_auth(mock);
 
-        let req = SimulatedTraderAddAccountRequest {
-            trader_id: "T001".into(),
-            password: "secret".into(),
-            template_id: "XAP50".into(),
-        };
-
-        let account_id = client.simulated_account_add(&req).await.unwrap();
+        let account_id = client
+            .simulated_account_add("T001", "secret", "XAP50")
+            .await
+            .unwrap();
         assert_eq!(account_id, "ACC001");
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::POST);
         assert!(reqs[0].uri.to_string().ends_with("/simulatedAccountAdd"));
+
+        let body: serde_json::Value = serde_json::from_slice(&reqs[0].body).unwrap();
+        assert_eq!(body["TraderId"], "T001");
+        assert_eq!(body["Password"], "secret");
+        assert_eq!(body["TemplateId"], "XAP50");
     }
 
     // --- simulated_account_reset ---
@@ -368,12 +616,10 @@ mod tests {
         let mock = MockHttp::new(vec![MockResponse::ok(r#"{"status":"OK"}"#)]);
         let client = test_client_with_auth(mock);
 
-        let req = SimulatedAccountResetRequest {
-            account_id: "ACC001".into(),
-            template_id: "XAP100".into(),
-        };
-
-        let resp = client.simulated_account_reset(&req).await.unwrap();
+        let resp = client
+            .simulated_account_reset("ACC001", "XAP100")
+            .await
+            .unwrap();
         assert_eq!(resp.status, ResponseStatus::Ok);
 
         let reqs = client.request.http.recorded_requests();
@@ -382,6 +628,7 @@ mod tests {
 
         let body: serde_json::Value = serde_json::from_slice(&reqs[0].body).unwrap();
         assert_eq!(body["AccountId"], "ACC001");
+        assert_eq!(body["TemplateId"], "XAP100");
     }
 
     // --- simulated_account_expire ---
@@ -391,11 +638,7 @@ mod tests {
         let mock = MockHttp::new(vec![MockResponse::ok(r#"{"status":"OK"}"#)]);
         let client = test_client_with_auth(mock);
 
-        let req = SimulatedAccountExpireRequest {
-            account_id: "ACC001".into(),
-        };
-
-        let resp = client.simulated_account_expire(&req).await.unwrap();
+        let resp = client.simulated_account_expire("ACC001").await.unwrap();
         assert_eq!(resp.status, ResponseStatus::Ok);
 
         let reqs = client.request.http.recorded_requests();
@@ -413,12 +656,10 @@ mod tests {
         let mock = MockHttp::new(vec![MockResponse::ok(r#"{"status":"OK"}"#)]);
         let client = test_client_with_auth(mock);
 
-        let req = SimulatedAccountAddCashRequest {
-            account_id: "ACC001".into(),
-            amount: 10_000.0,
-        };
-
-        client.simulated_account_add_cash(&req).await.unwrap();
+        client
+            .simulated_account_add_cash("ACC001", 10_000.0)
+            .await
+            .unwrap();
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::POST);
@@ -469,15 +710,9 @@ mod tests {
         let mock = MockHttp::new(vec![MockResponse::ok(r#"{"status":"OK"}"#)]);
         let client = test_client_with_auth(mock);
 
-        let req = SimulatedAccountLiquidateRequest {
-            accounts: Some(vec!["ACC001".into(), "ACC002".into()]),
-            groups: None,
-            except_accounts: None,
-            force_manual_liquidation: Some(true),
-            use_manual_liquidation_for_illiquid_markets: None,
-            send_account_email: None,
-            send_office_email: None,
-        };
+        let req = LiquidateBuilder::new()
+            .accounts(&["ACC001", "ACC002"])
+            .force_manual(true);
 
         client.simulated_account_liquidate(&req).await.unwrap();
 
@@ -493,6 +728,7 @@ mod tests {
         let body: serde_json::Value = serde_json::from_slice(&reqs[0].body).unwrap();
         assert_eq!(body["Accounts"], serde_json::json!(["ACC001", "ACC002"]));
         assert_eq!(body["ForceManualLiquidation"], true);
+        assert!(body.get("Groups").is_none());
     }
 
     // --- simulated_account_set_risk ---
@@ -502,24 +738,9 @@ mod tests {
         let mock = MockHttp::new(vec![MockResponse::ok(r#"{"status":"OK"}"#)]);
         let client = test_client_with_auth(mock);
 
-        let req = SimulatedAccountSetRiskRequest {
-            account_id: "ACC001".into(),
-            liquidation_account_value: Some(25_000.0),
-            liquidation_loss_from_start_of_day: None,
-            liquidation_loss_from_high_of_day: None,
-            liquidation_loss_from_high_of_multiday: None,
-            liquidation_pct_loss_from_start_of_day: None,
-            liquidation_pct_loss_from_high_of_day: None,
-            liquidation_pct_loss_from_high_of_multiday: None,
-            liquidation_pct_margin_deficiency: None,
-            liquidation_max_value_override: None,
-            reduce_positions_only: None,
-            restore_trading: None,
-            margin_schedule_name: None,
-            template_id: None,
-        };
+        let risk = RiskBuilder::new("ACC001").liquidation_account_value(25_000.0);
 
-        client.simulated_account_set_risk(&req).await.unwrap();
+        client.simulated_account_set_risk(&risk).await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::POST);
@@ -533,7 +754,6 @@ mod tests {
         let body: serde_json::Value = serde_json::from_slice(&reqs[0].body).unwrap();
         assert_eq!(body["AccountId"], "ACC001");
         assert_eq!(body["LiquidationAccountValue"], 25_000.0);
-        // Optional None fields should be omitted
         assert!(body.get("ReducePositionsOnly").is_none());
     }
 
@@ -563,12 +783,10 @@ mod tests {
         let mock = MockHttp::new(vec![MockResponse::ok(b"not json".to_vec())]);
         let client = test_client_with_auth(mock);
 
-        let req = SimulatedAccountAddCashRequest {
-            account_id: "ACC001".into(),
-            amount: 100.0,
-        };
-
-        let err = client.simulated_account_add_cash(&req).await.unwrap_err();
+        let err = client
+            .simulated_account_add_cash("ACC001", 100.0)
+            .await
+            .unwrap_err();
         assert!(matches!(err, Error::Json(_)));
     }
 }

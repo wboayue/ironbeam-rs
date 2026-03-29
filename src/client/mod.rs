@@ -6,7 +6,7 @@ pub mod stream;
 
 pub use config::{ClientBuilder, Credentials};
 pub use http::HttpTransport;
-pub use rest::{OrderBuilder, OrderUpdate, SymbolSearchParams};
+pub use rest::{LiquidateBuilder, OrderBuilder, OrderUpdate, RiskBuilder, SymbolSearchParams};
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
