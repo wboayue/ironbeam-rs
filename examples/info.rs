@@ -1,13 +1,7 @@
 use std::env;
 use std::error::Error;
-use std::time::Duration;
 
 use ironbeam_rs::client::{Client, Credentials, SymbolSearchParams};
-
-/// Pause to stay under the API's 10-requests-per-second rate limit.
-async fn pace() {
-    tokio::time::sleep(Duration::from_millis(250)).await;
-}
 
 /// Demonstrate info API endpoints.
 ///
@@ -25,6 +19,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             api_key: env::var("IRONBEAM_API_KEY")?,
         })
         .demo()
+        .rate_limit(8)
         .connect()
         .await?;
 
@@ -33,17 +28,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Trader: {:?}, accounts: {:?}", trader.trader_id, trader.accounts);
 
     // User info
-    pace().await;
     let user = client.user_info(None).await?;
     println!("User: {:?}, email: {:?}", user.account_title, user.email_address_1);
 
     // Exchanges
-    pace().await;
     let exchanges = client.exchange_sources().await?;
     println!("\nExchanges: {exchanges:?}");
 
     // Futures search — returns unqualified symbols (e.g. "ES.M26")
-    pace().await;
     let futures = client.futures_symbols("CME", "ES").await?;
     println!("\nFutures for CME ES ({} contracts):", futures.len());
     for f in futures.iter().take(4) {
@@ -51,7 +43,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // Symbol search
-    pace().await;
     let params = SymbolSearchParams::new().text("GOLD").limit(5);
     let symbols = client.symbols(&params).await?;
     println!("\nSymbol search 'GOLD':");
@@ -65,7 +56,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .map(|s| s.symbol.clone())
         .unwrap_or_else(|| "XNYM:GCM.H26".into());
 
-    pace().await;
     let defs = client.security_definitions(&[&lookup_sym]).await?;
     println!("\nSecurity definition for {lookup_sym}:");
     for d in &defs {
@@ -75,7 +65,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
         );
     }
 
-    pace().await;
     let margins = client.security_margin(&[&lookup_sym]).await?;
     println!("\nMargin info for {lookup_sym}:");
     for m in &margins {
@@ -85,7 +74,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
         );
     }
 
-    pace().await;
     let statuses = client.security_status(&[&lookup_sym]).await?;
     println!("\nStatus for {lookup_sym}:");
     for s in &statuses {
@@ -93,7 +81,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // Strategy ID
-    pace().await;
     let strategy = client.strategy_id().await?;
     println!(
         "\nStrategy ID: {}, range: {}..{}",
@@ -101,7 +88,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     );
 
     // Explicit logout preferred over drop-based cleanup for guaranteed session teardown.
-    pace().await;
     client.logout().await?;
 
     Ok(())

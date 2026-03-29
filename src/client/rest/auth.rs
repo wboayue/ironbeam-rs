@@ -153,6 +153,7 @@ mod tests {
                 base_url: "http://test".into(),
                 auth_headers: HeaderMap::new(),
                 http: mock,
+                rate_limiter: None,
             },
             is_logged_out: AtomicBool::new(true),
         };
