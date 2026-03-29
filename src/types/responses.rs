@@ -188,14 +188,17 @@ pub struct SymbolOptionSpreadsResponse {
     pub symbol_spreads: Vec<Spread>,
 }
 
-/// Strategy ID response. Note: API uses PascalCase.
+/// Strategy ID response.
+///
+/// Note: the OpenAPI spec claims PascalCase (`Id`, `Minimum`, `Maximum`) but
+/// the live API returns lowercase. We accept both via `alias`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StrategyIdResponse {
-    #[serde(rename = "Id")]
+    #[serde(alias = "Id")]
     pub id: i64,
-    #[serde(rename = "Minimum")]
+    #[serde(alias = "Minimum")]
     pub minimum: i64,
-    #[serde(rename = "Maximum")]
+    #[serde(alias = "Maximum")]
     pub maximum: i64,
 }
 
@@ -282,6 +285,15 @@ mod tests {
         let json = r#"{"Id":12345,"Minimum":10000,"Maximum":20000}"#;
         let r: StrategyIdResponse = serde_json::from_str(json).unwrap();
         assert_eq!(r.id, 12345);
+    }
+
+    #[test]
+    fn strategy_id_lowercase() {
+        let json = r#"{"id":99,"minimum":1,"maximum":100,"status":"OK","message":"OK"}"#;
+        let r: StrategyIdResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(r.id, 99);
+        assert_eq!(r.minimum, 1);
+        assert_eq!(r.maximum, 100);
     }
 
     #[test]
