@@ -184,6 +184,37 @@ pub enum OrderStatusType {
     Complete,
 }
 
+impl OrderStatusType {
+    /// Wire-format string for use in URL path segments.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Any => "ANY",
+            Self::Invalid => "INVALID",
+            Self::Submitted => "SUBMITTED",
+            Self::New => "NEW",
+            Self::PartiallyFilled => "PARTIALLY_FILLED",
+            Self::Filled => "FILLED",
+            Self::DoneForDay => "DONE_FOR_DAY",
+            Self::Cancelled => "CANCELLED",
+            Self::Replaced => "REPLACED",
+            Self::PendingCancel => "PENDING_CANCEL",
+            Self::Stopped => "STOPPED",
+            Self::Rejected => "REJECTED",
+            Self::Suspended => "SUSPENDED",
+            Self::PendingNew => "PENDING_NEW",
+            Self::Calculated => "CALCULATED",
+            Self::Expired => "EXPIRED",
+            Self::AcceptedForBidding => "ACCEPTED_FOR_BIDDING",
+            Self::PendingReplace => "PENDING_REPLACE",
+            Self::CancelRejected => "CANCEL_REJECTED",
+            Self::OrderNotFound => "ORDER_NOT_FOUND",
+            Self::QueuedNew => "QUEUED_NEW",
+            Self::QueuedCancel => "QUEUED_CANCEL",
+            Self::Complete => "COMPLETE",
+        }
+    }
+}
+
 /// Position side.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]

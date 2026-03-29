@@ -371,11 +371,8 @@ impl<H: HttpTransport> Client<H> {
         status: OrderStatusType,
     ) -> Result<Vec<Order>> {
         let account_id = urlencoding::encode(account_id);
-        let status_str =
-            serde_json::to_value(status).map_err(|e| Error::Other(e.to_string()))?;
-        let status_str = status_str.as_str().unwrap_or("ANY");
         let resp: OrdersResponse = self
-            .get(&format!("/order/{account_id}/{status_str}"))
+            .get(&format!("/order/{account_id}/{}", status.as_str()))
             .await?;
         Ok(resp.orders)
     }
