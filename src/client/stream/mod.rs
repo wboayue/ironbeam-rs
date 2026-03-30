@@ -58,28 +58,46 @@ impl<'a, H: HttpTransport> StreamBuilder<'a, H> {
     /// Create the stream session, open the WebSocket, and return a live
     /// [`StreamHandle`] for subscribing to feeds and receiving events.
     pub async fn start(self) -> Result<StreamHandle<H>> {
-        // 1. Create stream session via REST.
-        let resp: StreamIdResponse = self.client.get("/stream/create").await?;
-        let stream_id = resp.stream_id;
-        tracing::info!(stream_id = %stream_id, "stream session created");
+        let (stream_id, token) = self.create_session().await?;
 
-        // 2. Extract bearer token for WebSocket URL.
-        let token = extract_token(&self.client.request.auth_headers)?;
-
-        // 3. Open WebSocket connection.
         let ws = match connection::connect(&self.client.request.base_url, &stream_id, &token).await
         {
             Ok(ws) => ws,
             Err(e) => {
-                // Stream session created on server but WebSocket failed.
-                // No destroy endpoint exists — session will expire server-side.
                 tracing::warn!(stream_id = %stream_id, error = %e, "websocket connect failed after stream session created");
                 return Err(e);
             }
         };
         tracing::info!(stream_id = %stream_id, "websocket connected");
 
-        // 4. Spawn message loop.
+        self.spawn_loop(stream_id, ws)
+    }
+
+    /// Start with a pre-built WebSocket transport (test seam).
+    #[cfg(test)]
+    pub(crate) async fn start_with_ws<W: connection::WsTransport>(
+        self,
+        ws: W,
+    ) -> Result<StreamHandle<H>> {
+        let (stream_id, _token) = self.create_session().await?;
+        self.spawn_loop(stream_id, ws)
+    }
+
+    /// Create the stream session via REST and extract the bearer token.
+    async fn create_session(&self) -> Result<(String, String)> {
+        let resp: StreamIdResponse = self.client.get("/stream/create").await?;
+        let stream_id = resp.stream_id;
+        tracing::info!(stream_id = %stream_id, "stream session created");
+        let token = extract_token(&self.client.request.auth_headers)?;
+        Ok((stream_id, token))
+    }
+
+    /// Spawn the message loop and build the [`StreamHandle`].
+    fn spawn_loop<W: connection::WsTransport>(
+        self,
+        stream_id: String,
+        ws: W,
+    ) -> Result<StreamHandle<H>> {
         let (tx, rx) = mpsc::channel(self.channel_capacity);
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
         let task = tokio::spawn(connection::message_loop(
@@ -380,6 +398,9 @@ fn extract_token(headers: &HeaderMap) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::client::http::mock::{MockHttp, MockResponse};
+    use crate::client::test_support::test_client_with_auth;
+    use connection::mock::MockWsTransport;
 
     #[test]
     fn extract_token_strips_bearer() {
@@ -399,5 +420,315 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, "Basic abc".parse().unwrap());
         assert!(extract_token(&headers).is_err());
+    }
+
+    #[tokio::test]
+    async fn start_creates_session_and_streams_events() {
+        let mock = MockHttp::new(vec![MockResponse::ok(
+            r#"{"status":"OK","streamId":"s-123"}"#,
+        )]);
+        let client = test_client_with_auth(mock);
+        let ws = MockWsTransport::from_json(&[r#"{"q":[{"s":"XCME:ES.U25"}]}"#]);
+
+        let mut stream = client.stream().start_with_ws(ws).await.unwrap();
+
+        assert_eq!(stream.stream_id(), "s-123");
+
+        let event = stream.next().await.unwrap().unwrap();
+        assert!(matches!(event, StreamEvent::Quotes(..)));
+
+        // Verify REST call was made
+        let reqs = client.request.http.recorded_requests();
+        assert_eq!(reqs.len(), 1);
+        assert!(reqs[0].uri.to_string().contains("/stream/create"));
+    }
+
+    #[tokio::test]
+    async fn start_propagates_create_error() {
+        let mock = MockHttp::new(vec![MockResponse::error(
+            hyper::StatusCode::INTERNAL_SERVER_ERROR,
+            r#"{"error1":"Server Error"}"#,
+        )]);
+        let client = test_client_with_auth(mock);
+        let ws = MockWsTransport::from_json(&[]);
+
+        let err = client.stream().start_with_ws(ws).await.unwrap_err();
+        assert!(matches!(err, Error::Api { status: 500, .. }));
+    }
+
+    #[tokio::test]
+    async fn stream_close_signals_shutdown() {
+        let mock = MockHttp::new(vec![MockResponse::ok(
+            r#"{"status":"OK","streamId":"s-456"}"#,
+        )]);
+        let client = test_client_with_auth(mock);
+        let ws = MockWsTransport::new(vec![]);
+
+        let stream = client.stream().start_with_ws(ws).await.unwrap();
+        stream.close().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn channel_capacity_is_applied() {
+        // 2 responses: stream/create + subscribe_quotes
+        let mock = MockHttp::new(vec![
+            MockResponse::ok(r#"{"status":"OK","streamId":"s-cap"}"#),
+            MockResponse::ok(r#"{"status":"OK"}"#),
+        ]);
+        let client = test_client_with_auth(mock);
+        let ws = MockWsTransport::from_json(&[r#"{"q":[{"s":"SYM"}]}"#]);
+
+        let mut stream = client
+            .stream()
+            .channel_capacity(4)
+            .start_with_ws(ws)
+            .await
+            .unwrap();
+
+        let event = stream.next().await.unwrap().unwrap();
+        assert!(matches!(event, StreamEvent::Quotes(..)));
+    }
+
+    #[tokio::test]
+    async fn subscribe_quotes_via_handle() {
+        let mock = MockHttp::new(vec![
+            MockResponse::ok(r#"{"status":"OK","streamId":"s-1"}"#),
+            MockResponse::ok(r#"{"status":"OK"}"#),
+        ]);
+        let client = test_client_with_auth(mock);
+        let ws = MockWsTransport::new(vec![]);
+
+        let stream = client.stream().start_with_ws(ws).await.unwrap();
+        stream.subscribe_quotes(&["XCME:ES.U25"]).await.unwrap();
+
+        let reqs = client.request.http.recorded_requests();
+        assert_eq!(reqs.len(), 2);
+        assert!(reqs[1].uri.to_string().contains("/market/quotes/subscribe/s-1"));
+    }
+
+    #[tokio::test]
+    async fn unsubscribe_quotes_via_handle() {
+        let mock = MockHttp::new(vec![
+            MockResponse::ok(r#"{"status":"OK","streamId":"s-1"}"#),
+            MockResponse::ok(r#"{"status":"OK"}"#),
+        ]);
+        let client = test_client_with_auth(mock);
+        let ws = MockWsTransport::new(vec![]);
+
+        let stream = client.stream().start_with_ws(ws).await.unwrap();
+        stream.unsubscribe_quotes(&["XCME:ES.U25"]).await.unwrap();
+
+        let reqs = client.request.http.recorded_requests();
+        assert!(reqs[1].uri.to_string().contains("/market/quotes/unsubscribe/s-1"));
+    }
+
+    #[tokio::test]
+    async fn subscribe_depth_via_handle() {
+        let mock = MockHttp::new(vec![
+            MockResponse::ok(r#"{"status":"OK","streamId":"s-1"}"#),
+            MockResponse::ok(r#"{"status":"OK"}"#),
+        ]);
+        let client = test_client_with_auth(mock);
+        let ws = MockWsTransport::new(vec![]);
+
+        let stream = client.stream().start_with_ws(ws).await.unwrap();
+        stream.subscribe_depth(&["XCME:ES.U25"]).await.unwrap();
+
+        let reqs = client.request.http.recorded_requests();
+        assert!(reqs[1].uri.to_string().contains("/market/depths/subscribe/s-1"));
+    }
+
+    #[tokio::test]
+    async fn unsubscribe_depth_via_handle() {
+        let mock = MockHttp::new(vec![
+            MockResponse::ok(r#"{"status":"OK","streamId":"s-1"}"#),
+            MockResponse::ok(r#"{"status":"OK"}"#),
+        ]);
+        let client = test_client_with_auth(mock);
+        let ws = MockWsTransport::new(vec![]);
+
+        let stream = client.stream().start_with_ws(ws).await.unwrap();
+        stream.unsubscribe_depth(&["XCME:ES.U25"]).await.unwrap();
+
+        let reqs = client.request.http.recorded_requests();
+        assert!(reqs[1].uri.to_string().contains("/market/depths/unsubscribe/s-1"));
+    }
+
+    #[tokio::test]
+    async fn subscribe_trades_via_handle() {
+        let mock = MockHttp::new(vec![
+            MockResponse::ok(r#"{"status":"OK","streamId":"s-1"}"#),
+            MockResponse::ok(r#"{"status":"OK"}"#),
+        ]);
+        let client = test_client_with_auth(mock);
+        let ws = MockWsTransport::new(vec![]);
+
+        let stream = client.stream().start_with_ws(ws).await.unwrap();
+        stream.subscribe_trades(&["XCME:ES.U25"]).await.unwrap();
+
+        let reqs = client.request.http.recorded_requests();
+        assert!(reqs[1].uri.to_string().contains("/market/trades/subscribe/s-1"));
+    }
+
+    #[tokio::test]
+    async fn unsubscribe_trades_via_handle() {
+        let mock = MockHttp::new(vec![
+            MockResponse::ok(r#"{"status":"OK","streamId":"s-1"}"#),
+            MockResponse::ok(r#"{"status":"OK"}"#),
+        ]);
+        let client = test_client_with_auth(mock);
+        let ws = MockWsTransport::new(vec![]);
+
+        let stream = client.stream().start_with_ws(ws).await.unwrap();
+        stream.unsubscribe_trades(&["XCME:ES.U25"]).await.unwrap();
+
+        let reqs = client.request.http.recorded_requests();
+        assert!(reqs[1].uri.to_string().contains("/market/trades/unsubscribe/s-1"));
+    }
+
+    #[tokio::test]
+    async fn subscribe_trade_bars_via_handle() {
+        use crate::types::{BarType, streaming::SubscribeBarsRequest};
+
+        let mock = MockHttp::new(vec![
+            MockResponse::ok(r#"{"status":"OK","streamId":"s-1"}"#),
+            MockResponse::ok(
+                r#"{"indicatorId":"IND1","valueNames":["date"],"valueTypes":["date"]}"#,
+            ),
+        ]);
+        let client = test_client_with_auth(mock);
+        let ws = MockWsTransport::new(vec![]);
+
+        let stream = client.stream().start_with_ws(ws).await.unwrap();
+        let resp = stream
+            .subscribe_trade_bars(&SubscribeBarsRequest {
+                symbol: "XCME:ES.U25".into(),
+                period: 1,
+                bar_type: BarType::Minute,
+                load_size: 100,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(resp.indicator_id, "IND1");
+        let reqs = client.request.http.recorded_requests();
+        assert!(reqs[1].uri.to_string().contains("/indicator/s-1/tradeBars/subscribe"));
+    }
+
+    #[tokio::test]
+    async fn subscribe_tick_bars_via_handle() {
+        use crate::types::{BarType, streaming::SubscribeBarsRequest};
+
+        let mock = MockHttp::new(vec![
+            MockResponse::ok(r#"{"status":"OK","streamId":"s-1"}"#),
+            MockResponse::ok(
+                r#"{"indicatorId":"IND2","valueNames":["date"],"valueTypes":["date"]}"#,
+            ),
+        ]);
+        let client = test_client_with_auth(mock);
+        let ws = MockWsTransport::new(vec![]);
+
+        let stream = client.stream().start_with_ws(ws).await.unwrap();
+        let resp = stream
+            .subscribe_tick_bars(&SubscribeBarsRequest {
+                symbol: "SYM".into(),
+                period: 5,
+                bar_type: BarType::Tick,
+                load_size: 50,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(resp.indicator_id, "IND2");
+        let reqs = client.request.http.recorded_requests();
+        assert!(reqs[1].uri.to_string().contains("/indicator/s-1/tickBars/subscribe"));
+    }
+
+    #[tokio::test]
+    async fn subscribe_time_bars_via_handle() {
+        use crate::types::{BarType, streaming::SubscribeBarsRequest};
+
+        let mock = MockHttp::new(vec![
+            MockResponse::ok(r#"{"status":"OK","streamId":"s-1"}"#),
+            MockResponse::ok(
+                r#"{"indicatorId":"IND3","valueNames":["date"],"valueTypes":["date"]}"#,
+            ),
+        ]);
+        let client = test_client_with_auth(mock);
+        let ws = MockWsTransport::new(vec![]);
+
+        let stream = client.stream().start_with_ws(ws).await.unwrap();
+        let resp = stream
+            .subscribe_time_bars(&SubscribeBarsRequest {
+                symbol: "SYM".into(),
+                period: 1,
+                bar_type: BarType::Minute,
+                load_size: 10,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(resp.indicator_id, "IND3");
+        let reqs = client.request.http.recorded_requests();
+        assert!(reqs[1].uri.to_string().contains("/indicator/s-1/timeBars/subscribe"));
+    }
+
+    #[tokio::test]
+    async fn subscribe_volume_bars_via_handle() {
+        use crate::types::{BarType, streaming::SubscribeBarsRequest};
+
+        let mock = MockHttp::new(vec![
+            MockResponse::ok(r#"{"status":"OK","streamId":"s-1"}"#),
+            MockResponse::ok(
+                r#"{"indicatorId":"IND4","valueNames":["date"],"valueTypes":["date"]}"#,
+            ),
+        ]);
+        let client = test_client_with_auth(mock);
+        let ws = MockWsTransport::new(vec![]);
+
+        let stream = client.stream().start_with_ws(ws).await.unwrap();
+        let resp = stream
+            .subscribe_volume_bars(&SubscribeBarsRequest {
+                symbol: "SYM".into(),
+                period: 100,
+                bar_type: BarType::Tick,
+                load_size: 20,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(resp.indicator_id, "IND4");
+        let reqs = client.request.http.recorded_requests();
+        assert!(reqs[1].uri.to_string().contains("/indicator/s-1/volumeBars/subscribe"));
+    }
+
+    #[tokio::test]
+    async fn unsubscribe_indicator_via_handle() {
+        let mock = MockHttp::new(vec![
+            MockResponse::ok(r#"{"status":"OK","streamId":"s-1"}"#),
+            MockResponse::ok(r#"{"status":"OK"}"#),
+        ]);
+        let client = test_client_with_auth(mock);
+        let ws = MockWsTransport::new(vec![]);
+
+        let stream = client.stream().start_with_ws(ws).await.unwrap();
+        stream.unsubscribe_indicator("IND1").await.unwrap();
+
+        let reqs = client.request.http.recorded_requests();
+        assert!(reqs[1].uri.to_string().contains("/indicator/s-1/unsubscribe/IND1"));
+    }
+
+    #[tokio::test]
+    async fn stream_handle_debug() {
+        let mock = MockHttp::new(vec![MockResponse::ok(
+            r#"{"status":"OK","streamId":"s-dbg"}"#,
+        )]);
+        let client = test_client_with_auth(mock);
+        let ws = MockWsTransport::new(vec![]);
+
+        let stream = client.stream().start_with_ws(ws).await.unwrap();
+        let debug = format!("{stream:?}");
+        assert!(debug.contains("s-dbg"));
+        assert!(debug.contains("http://test"));
     }
 }
