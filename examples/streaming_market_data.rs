@@ -81,7 +81,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
             StreamEvent::Trades(trades) => {
                 for t in &trades {
-                    println!("Trade {}: price={:?} size={:?}", t.symbol, t.price, t.size);
+                    println!(
+                        "Trade {}: price={} change={:?} size={:?} dir={:?} side={:?} seq={:?} time={:?}",
+                        t.symbol,
+                        t.price,
+                        t.change,
+                        t.size,
+                        t.tick_direction,
+                        t.aggressor_side,
+                        t.sequence_number,
+                        t.send_time.map(|ts| ts.time()),
+                    );
                 }
             }
             StreamEvent::Ping(_) => println!("keepalive"),
