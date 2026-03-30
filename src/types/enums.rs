@@ -307,41 +307,42 @@ pub enum BarType {
     Tick,
 }
 
-/// System-priced trade indicator.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum SystemPricedTrade {
-    Invalid,
-    System,
-    Crack,
+dual_format_enum! {
+    /// System-priced trade indicator.
+    ///
+    /// REST sends strings (`"INVALID"`), streaming sends integers (`0`).
+    pub enum SystemPricedTrade {
+        Invalid = (0, "INVALID"),
+        System = (1, "SYSTEM"),
+        Crack = (2, "CRACK"),
+    }
 }
 
-/// Trade investigation status.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum InvestigationStatus {
-    Invalid,
-    Investigating,
-    Completed,
+dual_format_enum! {
+    /// Trade investigation status.
+    ///
+    /// REST sends strings (`"INVALID"`), streaming sends integers (`0`).
+    pub enum InvestigationStatus {
+        Invalid = (0, "INVALID"),
+        Investigating = (1, "INVESTIGATING"),
+        Completed = (2, "COMPLETED"),
+    }
 }
 
-/// Block trade type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum BlockTrade {
-    Invalid,
-    Normal,
-    #[serde(rename = "EFP")]
-    Efp,
-    #[serde(rename = "EFS")]
-    Efs,
-    OffExchange,
-    #[serde(rename = "NG")]
-    Ng,
-    #[serde(rename = "CCX")]
-    Ccx,
-    #[serde(rename = "EFR")]
-    Efr,
+dual_format_enum! {
+    /// Block trade type.
+    ///
+    /// REST sends strings (`"INVALID"`), streaming sends integers (`0`).
+    pub enum BlockTrade {
+        Invalid = (0, "INVALID"),
+        Normal = (1, "NORMAL"),
+        Efp = (2, "EFP"),
+        Efs = (3, "EFS"),
+        OffExchange = (4, "OFF_EXCHANGE"),
+        Ng = (5, "NG"),
+        Ccx = (6, "CCX"),
+        Efr = (7, "EFR"),
+    }
 }
 
 /// Exchange strategy type.
@@ -448,6 +449,7 @@ pub enum TickDirectionType {
     Plus = 0,
     Same = 1,
     Minus = 2,
+    ZeroMinus = 3,
     Invalid = 255,
 }
 
@@ -568,6 +570,46 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&BlockTrade::OffExchange).unwrap(),
             "\"OFF_EXCHANGE\""
+        );
+        assert_eq!(
+            serde_json::from_str::<BlockTrade>("0").unwrap(),
+            BlockTrade::Invalid
+        );
+        assert_eq!(
+            serde_json::from_str::<BlockTrade>("2").unwrap(),
+            BlockTrade::Efp
+        );
+    }
+
+    #[test]
+    fn system_priced_trade_round_trip() {
+        assert_eq!(
+            serde_json::to_string(&SystemPricedTrade::System).unwrap(),
+            "\"SYSTEM\""
+        );
+        assert_eq!(
+            serde_json::from_str::<SystemPricedTrade>("0").unwrap(),
+            SystemPricedTrade::Invalid
+        );
+        assert_eq!(
+            serde_json::from_str::<SystemPricedTrade>("\"CRACK\"").unwrap(),
+            SystemPricedTrade::Crack
+        );
+    }
+
+    #[test]
+    fn investigation_status_round_trip() {
+        assert_eq!(
+            serde_json::to_string(&InvestigationStatus::Investigating).unwrap(),
+            "\"INVESTIGATING\""
+        );
+        assert_eq!(
+            serde_json::from_str::<InvestigationStatus>("0").unwrap(),
+            InvestigationStatus::Invalid
+        );
+        assert_eq!(
+            serde_json::from_str::<InvestigationStatus>("\"COMPLETED\"").unwrap(),
+            InvestigationStatus::Completed
         );
     }
 

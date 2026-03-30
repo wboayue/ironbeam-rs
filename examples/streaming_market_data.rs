@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Stream created: {}", stream.stream_id());
 
     // Update to the current front-month contract (e.g. ES.Z26 for Dec 2026).
-    let symbols = &["XCME:ES.U26"];
+    let symbols = &["XCME:ES.M26"];
 
     match stream_type.as_str() {
         "quote" => {
@@ -70,10 +70,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
             StreamEvent::Depth(depths) => {
                 for d in &depths {
                     println!(
-                        "Depth {}: bids={} asks={}",
+                        "Depth {}: bids={} {:?} asks={} {:?}",
                         d.symbol,
                         d.bids.len(),
-                        d.asks.len()
+                        d.bids.first().map(|b| b.price),
+                        d.asks.len(),
+                        d.asks.first().map(|a| a.price)
                     );
                 }
             }
