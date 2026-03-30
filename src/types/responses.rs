@@ -88,17 +88,17 @@ pub struct OrdersFillsResponse {
     pub fills: Vec<OrderFill>,
 }
 
-/// Quotes response. Note: API uses PascalCase `Quotes`.
+/// Quotes response. API sends lowercase `quotes`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct QuotesResponse {
-    #[serde(rename = "Quotes", default)]
+    #[serde(alias = "Quotes", default)]
     pub quotes: Vec<QuoteFull>,
 }
 
-/// Depth response. Note: API uses PascalCase `Depths`.
+/// Depth response. API sends lowercase `depths`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DepthResponse {
-    #[serde(rename = "Depths", default)]
+    #[serde(alias = "Depths", default)]
     pub depths: Vec<Depth>,
 }
 

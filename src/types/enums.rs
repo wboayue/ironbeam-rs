@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use serde_repr::{Deserialize_repr, Serialize_repr};
 
 /// Serde visitor that accepts both integer and string representations.
 ///
@@ -433,24 +432,28 @@ dual_format_enum! {
     }
 }
 
-/// Aggressor side (integer-encoded).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize_repr, Deserialize_repr)]
-#[repr(i32)]
-pub enum AggressorSideType {
-    Invalid = 0,
-    Buy = 1,
-    Sell = 2,
+dual_format_enum! {
+    /// Aggressor side.
+    ///
+    /// REST sends strings (`"BUY"`), streaming sends integers (`1`).
+    pub enum AggressorSideType {
+        Invalid = (0, "INVALID"),
+        Buy = (1, "BUY"),
+        Sell = (2, "SELL"),
+    }
 }
 
-/// Tick direction (integer-encoded, used in streaming).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize_repr, Deserialize_repr)]
-#[repr(i32)]
-pub enum TickDirectionType {
-    Plus = 0,
-    Same = 1,
-    Minus = 2,
-    ZeroMinus = 3,
-    Invalid = 255,
+dual_format_enum! {
+    /// Tick direction.
+    ///
+    /// REST sends strings (`"PLUS"`), streaming sends integers (`0`).
+    pub enum TickDirectionType {
+        Plus = (0, "PLUS"),
+        Same = (1, "SAME"),
+        Minus = (2, "MINUS"),
+        ZeroMinus = (3, "ZERO_MINUS"),
+        Invalid = (255, "INVALID"),
+    }
 }
 
 #[cfg(test)]
@@ -517,22 +520,39 @@ mod tests {
 
     #[test]
     fn aggressor_side_round_trip() {
-        assert_eq!(serde_json::to_string(&AggressorSideType::Buy).unwrap(), "1");
+        // Serializes as string
+        assert_eq!(
+            serde_json::to_string(&AggressorSideType::Buy).unwrap(),
+            r#""BUY""#
+        );
+        // Deserializes from integer (streaming)
         assert_eq!(
             serde_json::from_str::<AggressorSideType>("2").unwrap(),
             AggressorSideType::Sell
+        );
+        // Deserializes from string (REST)
+        assert_eq!(
+            serde_json::from_str::<AggressorSideType>(r#""BUY""#).unwrap(),
+            AggressorSideType::Buy
         );
     }
 
     #[test]
     fn tick_direction_type_round_trip() {
+        // Serializes as string
         assert_eq!(
             serde_json::to_string(&TickDirectionType::Invalid).unwrap(),
-            "255"
+            r#""INVALID""#
         );
+        // Deserializes from integer (streaming)
         assert_eq!(
             serde_json::from_str::<TickDirectionType>("0").unwrap(),
             TickDirectionType::Plus
+        );
+        // Deserializes from string (REST)
+        assert_eq!(
+            serde_json::from_str::<TickDirectionType>(r#""SAME""#).unwrap(),
+            TickDirectionType::Same
         );
     }
 

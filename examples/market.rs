@@ -23,7 +23,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .connect()
         .await?;
 
-    let symbol = "XCEC:GC.J26";
+    let symbol = "XCME:ES.M26";
 
     // Quotes
     let quotes = client.quotes(&[symbol]).await?;

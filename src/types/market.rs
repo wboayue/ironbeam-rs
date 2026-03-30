@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 use time::{Date, OffsetDateTime};
 
 use super::{
-    AggressorSideType, BlockTrade, DepthSide, InvestigationStatus, Symbol, SystemPricedTrade,
-    TickDirection, TickDirectionType, option_date_yyyymmdd, option_timestamp_ms,
+    AggressorSideType, BlockTrade, DepthSide, InvestigationStatus, SecurityStatusType, Symbol,
+    SystemPricedTrade, TickDirection, TickDirectionType, option_date_yyyymmdd, option_timestamp_ms,
 };
 
 /// Full market quote. Used in both REST and streaming.
@@ -39,11 +39,11 @@ pub struct QuoteFull {
 
     /// Aggressor side.
     #[serde(rename = "ags", default)]
-    pub aggressor_side: Option<i32>,
+    pub aggressor_side: Option<AggressorSideType>,
 
     /// Tick direction.
     #[serde(rename = "td", default)]
-    pub tick_direction: Option<i32>,
+    pub tick_direction: Option<TickDirectionType>,
 
     /// Settlement price.
     #[serde(rename = "stt", default)]
@@ -127,7 +127,7 @@ pub struct QuoteFull {
 
     /// Security status.
     #[serde(rename = "secs", default)]
-    pub security_status: Option<i32>,
+    pub security_status: Option<SecurityStatusType>,
 
     /// Session date.
     #[serde(rename = "sdt", default, with = "option_date_yyyymmdd")]
