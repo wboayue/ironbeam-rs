@@ -273,3 +273,46 @@ pub(crate) mod test_support {
         }
     };
 }
+
+#[cfg(test)]
+mod tests {
+    use super::http::mock::{MockHttp, MockResponse};
+    use super::rate_limiter::RateLimiter;
+    use super::test_support::test_client_with_auth;
+    use super::*;
+
+    #[test]
+    fn client_debug_redacts_auth() {
+        let mock = MockHttp::new(vec![]);
+        let client = test_client_with_auth(mock);
+        let debug = format!("{client:?}");
+        assert!(debug.contains("[redacted]"));
+        assert!(debug.contains("http://test"));
+        assert!(!debug.contains("tok_test"));
+    }
+
+    #[tokio::test]
+    async fn request_helper_applies_rate_limiter() {
+        let mock = MockHttp::new(vec![
+            MockResponse::ok(r#"{"status":"OK"}"#),
+            MockResponse::ok(r#"{"status":"OK"}"#),
+        ]);
+        let mut headers = hyper::header::HeaderMap::new();
+        headers.insert(
+            hyper::header::AUTHORIZATION,
+            hyper::header::HeaderValue::from_static("Bearer tok"),
+        );
+        let helper = RequestHelper {
+            http: mock,
+            base_url: "http://test".into(),
+            auth_headers: headers,
+            rate_limiter: Some(RateLimiter::new(10)),
+        };
+
+        let _: crate::types::SuccessResponse = helper.get("/test1").await.unwrap();
+        let _: crate::types::SuccessResponse = helper.get("/test2").await.unwrap();
+
+        let reqs = helper.http.recorded_requests();
+        assert_eq!(reqs.len(), 2);
+    }
+}

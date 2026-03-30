@@ -757,6 +757,77 @@ mod tests {
         assert!(body.get("ReducePositionsOnly").is_none());
     }
 
+    // --- LiquidateBuilder optional setters ---
+
+    #[tokio::test]
+    async fn liquidate_builder_all_fields() {
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"status":"OK"}"#)]);
+        let client = test_client_with_auth(mock);
+
+        let req = LiquidateBuilder::new()
+            .accounts(&["ACC001"])
+            .groups(&["GRP1", "GRP2"])
+            .except_accounts(&["ACC999"])
+            .force_manual(false)
+            .manual_for_illiquid(true)
+            .send_account_email(true)
+            .send_office_email(false);
+
+        client.simulated_account_liquidate(&req).await.unwrap();
+
+        let reqs = client.request.http.recorded_requests();
+        let body: serde_json::Value = serde_json::from_slice(&reqs[0].body).unwrap();
+        assert_eq!(body["Accounts"], serde_json::json!(["ACC001"]));
+        assert_eq!(body["Groups"], serde_json::json!(["GRP1", "GRP2"]));
+        assert_eq!(body["ExceptAccounts"], serde_json::json!(["ACC999"]));
+        assert_eq!(body["ForceManualLiquidation"], false);
+        assert_eq!(body["UseManualLiquidationForIlliquidMarkets"], true);
+        assert_eq!(body["SendAccountEmail"], true);
+        assert_eq!(body["SendOfficeEmail"], false);
+    }
+
+    // --- RiskBuilder all setters ---
+
+    #[tokio::test]
+    async fn risk_builder_all_fields() {
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"status":"OK"}"#)]);
+        let client = test_client_with_auth(mock);
+
+        let risk = RiskBuilder::new("ACC001")
+            .liquidation_account_value(25_000.0)
+            .liquidation_loss_from_start_of_day(1_000.0)
+            .liquidation_loss_from_high_of_day(2_000.0)
+            .liquidation_loss_from_high_of_multiday(3_000.0)
+            .liquidation_pct_loss_from_start_of_day(5.0)
+            .liquidation_pct_loss_from_high_of_day(10.0)
+            .liquidation_pct_loss_from_high_of_multiday(15.0)
+            .liquidation_pct_margin_deficiency(20.0)
+            .liquidation_max_value_override(50_000.0)
+            .reduce_positions_only(true)
+            .restore_trading(false)
+            .margin_schedule_name("SCHED1")
+            .template_id("TMPL1");
+
+        client.simulated_account_set_risk(&risk).await.unwrap();
+
+        let reqs = client.request.http.recorded_requests();
+        let body: serde_json::Value = serde_json::from_slice(&reqs[0].body).unwrap();
+        assert_eq!(body["AccountId"], "ACC001");
+        assert_eq!(body["LiquidationAccountValue"], 25_000.0);
+        assert_eq!(body["LiquidationLossFromStartOfDay"], 1_000.0);
+        assert_eq!(body["LiquidationLossFromHighOfDay"], 2_000.0);
+        assert_eq!(body["LiquidationLossFromHighOfMultiday"], 3_000.0);
+        assert_eq!(body["LiquidationPctLossFromStartOfDay"], 5.0);
+        assert_eq!(body["LiquidationPctLossFromHighOfDay"], 10.0);
+        assert_eq!(body["LiquidationPctLossFromHighOfMultiday"], 15.0);
+        assert_eq!(body["LiquidationPctMarginDeficiency"], 20.0);
+        assert_eq!(body["LiquidationMaxValueOverride"], 50_000.0);
+        assert_eq!(body["ReducePositionsOnly"], true);
+        assert_eq!(body["RestoreTrading"], false);
+        assert_eq!(body["MarginScheduleName"], "SCHED1");
+        assert_eq!(body["TemplateId"], "TMPL1");
+    }
+
     // --- auth header forwarding ---
 
     #[tokio::test]

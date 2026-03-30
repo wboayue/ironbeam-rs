@@ -4,6 +4,7 @@ use hyper::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 
 use crate::error::{Error, Result};
 
+use super::http::HttpTransport;
 use super::rate_limiter::RateLimiter;
 use super::rest::auth;
 use super::{Client, RequestHelper, http::HttpClient};
@@ -88,10 +89,6 @@ impl ClientBuilder {
 
     /// Authenticate and return a connected [`Client`].
     pub async fn connect(self) -> Result<Client> {
-        let credentials = self
-            .credentials
-            .ok_or_else(|| Error::Auth("credentials not set".into()))?;
-
         if rustls::crypto::ring::default_provider()
             .install_default()
             .is_err()
@@ -99,6 +96,20 @@ impl ClientBuilder {
             tracing::debug!("rustls CryptoProvider already installed, using existing");
         }
         let http = HttpClient::new();
+        self.connect_with_http(http).await
+    }
+
+    /// Authenticate using the provided transport and return a connected [`Client`].
+    ///
+    /// Extracted from [`connect()`] so tests can inject a mock transport.
+    pub(crate) async fn connect_with_http<H: HttpTransport>(
+        self,
+        http: H,
+    ) -> Result<Client<H>> {
+        let credentials = self
+            .credentials
+            .ok_or_else(|| Error::Auth("credentials not set".into()))?;
+
         let token = auth::authenticate(&http, &self.base_url, &credentials).await?;
 
         let mut auth_headers = HeaderMap::new();
@@ -117,5 +128,162 @@ impl ClientBuilder {
             },
             is_logged_out: AtomicBool::new(false),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use hyper::header::AUTHORIZATION;
+    use hyper::StatusCode;
+
+    use crate::client::http::mock::{MockHttp, MockResponse};
+    use crate::error::Error;
+
+    use super::*;
+
+    fn builder_with_creds() -> ClientBuilder {
+        ClientBuilder::new().credentials(Credentials {
+            username: "user".into(),
+            password: "pass".into(),
+            api_key: "key123".into(),
+        })
+    }
+
+    #[tokio::test]
+    async fn connect_returns_authenticated_client() {
+        let mock = MockHttp::new(vec![MockResponse::ok(
+            r#"{"status":"OK","token":"tok_abc"}"#,
+        )]);
+
+        let client = builder_with_creds()
+            .connect_with_http(mock)
+            .await
+            .unwrap();
+
+        let auth = client
+            .request
+            .auth_headers
+            .get(AUTHORIZATION)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert_eq!(auth, "Bearer tok_abc");
+    }
+
+    #[tokio::test]
+    async fn connect_missing_credentials() {
+        let mock = MockHttp::new(vec![]);
+
+        let err = ClientBuilder::new()
+            .connect_with_http(mock)
+            .await
+            .unwrap_err();
+
+        assert!(matches!(err, Error::Auth(msg) if msg.contains("credentials")));
+    }
+
+    #[tokio::test]
+    async fn connect_auth_failure() {
+        let mock = MockHttp::new(vec![MockResponse::error(
+            StatusCode::FORBIDDEN,
+            r#"{"error1":"Forbidden"}"#,
+        )]);
+
+        let err = builder_with_creds()
+            .connect_with_http(mock)
+            .await
+            .unwrap_err();
+
+        assert!(matches!(err, Error::Api { status: 403, .. }));
+    }
+
+    #[tokio::test]
+    async fn connect_with_rate_limit() {
+        let mock = MockHttp::new(vec![MockResponse::ok(
+            r#"{"status":"OK","token":"tok"}"#,
+        )]);
+
+        let client = builder_with_creds()
+            .rate_limit(8)
+            .connect_with_http(mock)
+            .await
+            .unwrap();
+
+        assert!(client.request.rate_limiter.is_some());
+    }
+
+    #[tokio::test]
+    async fn connect_without_rate_limit() {
+        let mock = MockHttp::new(vec![MockResponse::ok(
+            r#"{"status":"OK","token":"tok"}"#,
+        )]);
+
+        let client = builder_with_creds()
+            .connect_with_http(mock)
+            .await
+            .unwrap();
+
+        assert!(client.request.rate_limiter.is_none());
+    }
+
+    #[test]
+    fn credentials_debug_redacts_secrets() {
+        let creds = Credentials {
+            username: "alice".into(),
+            password: "hunter2".into(),
+            api_key: "sk-secret".into(),
+        };
+        let debug = format!("{creds:?}");
+        assert!(debug.contains("alice"));
+        assert!(!debug.contains("hunter2"));
+        assert!(!debug.contains("sk-secret"));
+        assert!(debug.contains("***"));
+    }
+
+    #[tokio::test]
+    async fn connect_demo_sets_demo_url() {
+        let mock = MockHttp::new(vec![MockResponse::ok(
+            r#"{"status":"OK","token":"tok"}"#,
+        )]);
+
+        let client = builder_with_creds()
+            .demo()
+            .connect_with_http(mock)
+            .await
+            .unwrap();
+
+        assert!(client.request.base_url.contains("demo.ironbeamapi.com"));
+    }
+
+    #[tokio::test]
+    async fn connect_live_sets_live_url() {
+        let mock = MockHttp::new(vec![MockResponse::ok(
+            r#"{"status":"OK","token":"tok"}"#,
+        )]);
+
+        let client = builder_with_creds()
+            .live()
+            .connect_with_http(mock)
+            .await
+            .unwrap();
+
+        assert!(client.request.base_url.contains("live.ironbeamapi.com"));
+    }
+
+    #[tokio::test]
+    async fn connect_uses_custom_base_url() {
+        let mock = MockHttp::new(vec![MockResponse::ok(
+            r#"{"status":"OK","token":"tok"}"#,
+        )]);
+
+        let client = builder_with_creds()
+            .base_url("http://custom:9090/v2")
+            .connect_with_http(mock)
+            .await
+            .unwrap();
+
+        assert_eq!(client.request.base_url, "http://custom:9090/v2");
+        let reqs = client.request.http.recorded_requests();
+        assert!(reqs[0].uri.to_string().starts_with("http://custom:9090/v2"));
     }
 }
