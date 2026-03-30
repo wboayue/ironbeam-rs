@@ -9,7 +9,7 @@ use ironbeam_rs::client::{Client, Credentials};
 /// Usage:
 ///
 /// ```sh
-/// cargo run --example streaming_market_data -- [quote|depth|trades]
+/// cargo run --example streaming_market_data -- [quote|depth|trades|all]
 /// ```
 ///
 /// Defaults to `quote` if no argument is given.
@@ -51,8 +51,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
             stream.subscribe_trades(symbols).await?;
             println!("Subscribed to trades");
         }
+        "all" => {
+            stream.subscribe_quotes(symbols).await?;
+            stream.subscribe_depth(symbols).await?;
+            stream.subscribe_trades(symbols).await?;
+            println!("Subscribed to quotes, depth, and trades");
+        }
         other => {
-            eprintln!("Unknown stream type: {other}. Use quote, depth, or trades.");
+            eprintln!("Unknown stream type: {other}. Use quote, depth, trades, or all.");
             std::process::exit(1);
         }
     }
