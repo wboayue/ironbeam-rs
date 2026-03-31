@@ -50,7 +50,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Added account: {account_id}");
 
     // 3. Add cash to the account
-    client.simulated_account_add_cash(&account_id, 25_000.0).await?;
+    client
+        .simulated_account_add_cash(&account_id, 25_000.0)
+        .await?;
     println!("Added $25,000 to {account_id}");
 
     // 4. Get cash report
@@ -65,7 +67,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // 5. Reset the account
-    client.simulated_account_reset(&account_id, "XAP100").await?;
+    client
+        .simulated_account_reset(&account_id, "XAP100")
+        .await?;
     println!("Reset {account_id}");
 
     // 6. Expire the account

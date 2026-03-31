@@ -39,7 +39,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // Place a limit order (far from market to avoid fills)
-    let order = OrderBuilder::limit("XCEC:GC.J26", OrderSide::Buy, 1.0, 1000.0, DurationType::Day);
+    let order = OrderBuilder::limit(
+        "XCEC:GC.J26",
+        OrderSide::Buy,
+        1.0,
+        1000.0,
+        DurationType::Day,
+    );
     let resp = client.place_order(account_id, &order).await?;
     println!(
         "\nPlaced order: id={:?} strategy={:?}",

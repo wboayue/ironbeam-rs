@@ -102,10 +102,7 @@ impl ClientBuilder {
     /// Authenticate using the provided transport and return a connected [`Client`].
     ///
     /// Extracted from [`connect()`] so tests can inject a mock transport.
-    pub(crate) async fn connect_with_http<H: HttpTransport>(
-        self,
-        http: H,
-    ) -> Result<Client<H>> {
+    pub(crate) async fn connect_with_http<H: HttpTransport>(self, http: H) -> Result<Client<H>> {
         let credentials = self
             .credentials
             .ok_or_else(|| Error::Auth("credentials not set".into()))?;
@@ -133,8 +130,8 @@ impl ClientBuilder {
 
 #[cfg(test)]
 mod tests {
-    use hyper::header::AUTHORIZATION;
     use hyper::StatusCode;
+    use hyper::header::AUTHORIZATION;
 
     use crate::client::http::mock::{MockHttp, MockResponse};
     use crate::error::Error;
@@ -155,10 +152,7 @@ mod tests {
             r#"{"status":"OK","token":"tok_abc"}"#,
         )]);
 
-        let client = builder_with_creds()
-            .connect_with_http(mock)
-            .await
-            .unwrap();
+        let client = builder_with_creds().connect_with_http(mock).await.unwrap();
 
         let auth = client
             .request
@@ -199,9 +193,7 @@ mod tests {
 
     #[tokio::test]
     async fn connect_with_rate_limit() {
-        let mock = MockHttp::new(vec![MockResponse::ok(
-            r#"{"status":"OK","token":"tok"}"#,
-        )]);
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"status":"OK","token":"tok"}"#)]);
 
         let client = builder_with_creds()
             .rate_limit(8)
@@ -214,14 +206,9 @@ mod tests {
 
     #[tokio::test]
     async fn connect_without_rate_limit() {
-        let mock = MockHttp::new(vec![MockResponse::ok(
-            r#"{"status":"OK","token":"tok"}"#,
-        )]);
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"status":"OK","token":"tok"}"#)]);
 
-        let client = builder_with_creds()
-            .connect_with_http(mock)
-            .await
-            .unwrap();
+        let client = builder_with_creds().connect_with_http(mock).await.unwrap();
 
         assert!(client.request.rate_limiter.is_none());
     }
@@ -242,9 +229,7 @@ mod tests {
 
     #[tokio::test]
     async fn connect_demo_sets_demo_url() {
-        let mock = MockHttp::new(vec![MockResponse::ok(
-            r#"{"status":"OK","token":"tok"}"#,
-        )]);
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"status":"OK","token":"tok"}"#)]);
 
         let client = builder_with_creds()
             .demo()
@@ -257,9 +242,7 @@ mod tests {
 
     #[tokio::test]
     async fn connect_live_sets_live_url() {
-        let mock = MockHttp::new(vec![MockResponse::ok(
-            r#"{"status":"OK","token":"tok"}"#,
-        )]);
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"status":"OK","token":"tok"}"#)]);
 
         let client = builder_with_creds()
             .live()
@@ -272,9 +255,7 @@ mod tests {
 
     #[tokio::test]
     async fn connect_uses_custom_base_url() {
-        let mock = MockHttp::new(vec![MockResponse::ok(
-            r#"{"status":"OK","token":"tok"}"#,
-        )]);
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"status":"OK","token":"tok"}"#)]);
 
         let client = builder_with_creds()
             .base_url("http://custom:9090/v2")

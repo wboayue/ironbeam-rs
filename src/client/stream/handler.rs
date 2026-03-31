@@ -200,5 +200,4 @@ mod tests {
         let events: Vec<_> = sr.into_events().collect();
         assert!(events.is_empty());
     }
-
 }

@@ -3,8 +3,8 @@ use crate::client::http::HttpTransport;
 use crate::error::{Error, Result};
 use crate::types::{
     DurationType, Order, OrderBaseResponse, OrderCancelMultipleRequest, OrderFill, OrderRequest,
-    OrderSide, OrderStatusType, OrderType, OrderUpdateRequest, OrdersFillsResponse,
-    OrdersResponse, Symbol,
+    OrderSide, OrderStatusType, OrderType, OrderUpdateRequest, OrdersFillsResponse, OrdersResponse,
+    Symbol,
 };
 
 // ---------------------------------------------------------------------------
@@ -280,10 +280,7 @@ impl<H: HttpTransport> Client<H> {
         let order_id_enc = urlencoding::encode(order_id);
         let req = update.to_request(order_id);
         let resp: OrdersResponse = self
-            .put(
-                &format!("/order/{account_id}/update/{order_id_enc}"),
-                &req,
-            )
+            .put(&format!("/order/{account_id}/update/{order_id_enc}"), &req)
             .await?;
         Ok(resp.orders)
     }
@@ -325,11 +322,7 @@ impl<H: HttpTransport> Client<H> {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn cancel_orders(
-        &self,
-        account_id: &str,
-        order_ids: &[&str],
-    ) -> Result<Vec<Order>> {
+    pub async fn cancel_orders(&self, account_id: &str, order_ids: &[&str]) -> Result<Vec<Order>> {
         if order_ids.is_empty() {
             return Err(Error::Other("order_ids must not be empty".into()));
         }
@@ -339,10 +332,7 @@ impl<H: HttpTransport> Client<H> {
             order_ids: order_ids.iter().map(|s| s.to_string()).collect(),
         };
         let resp: OrdersResponse = self
-            .delete_with_body(
-                &format!("/order/{account_id_enc}/cancelMultiple"),
-                &req,
-            )
+            .delete_with_body(&format!("/order/{account_id_enc}/cancelMultiple"), &req)
             .await?;
         Ok(resp.orders)
     }
@@ -365,11 +355,7 @@ impl<H: HttpTransport> Client<H> {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn orders(
-        &self,
-        account_id: &str,
-        status: OrderStatusType,
-    ) -> Result<Vec<Order>> {
+    pub async fn orders(&self, account_id: &str, status: OrderStatusType) -> Result<Vec<Order>> {
         let account_id = urlencoding::encode(account_id);
         let resp: OrdersResponse = self
             .get(&format!("/order/{account_id}/{}", status.as_str()))
@@ -396,8 +382,7 @@ impl<H: HttpTransport> Client<H> {
     /// ```
     pub async fn order_fills(&self, account_id: &str) -> Result<Vec<OrderFill>> {
         let account_id = urlencoding::encode(account_id);
-        let resp: OrdersFillsResponse =
-            self.get(&format!("/order/{account_id}/fills")).await?;
+        let resp: OrdersFillsResponse = self.get(&format!("/order/{account_id}/fills")).await?;
         Ok(resp.fills)
     }
 
@@ -448,10 +433,8 @@ impl<H: HttpTransport> Client<H> {
     ) -> Result<OrderBaseResponse> {
         let account_id = urlencoding::encode(account_id);
         let order_id = urlencoding::encode(order_id);
-        self.get(&format!(
-            "/order/{account_id}/tostrategyId/{order_id}"
-        ))
-        .await
+        self.get(&format!("/order/{account_id}/tostrategyId/{order_id}"))
+            .await
     }
 }
 
@@ -485,8 +468,13 @@ mod tests {
 
     #[test]
     fn builder_limit_sets_price() {
-        let order =
-            OrderBuilder::limit("XCME:ES.U16", OrderSide::Sell, 2.0, 4500.0, DurationType::Day);
+        let order = OrderBuilder::limit(
+            "XCME:ES.U16",
+            OrderSide::Sell,
+            2.0,
+            4500.0,
+            DurationType::Day,
+        );
         let req = order.to_request();
         assert_eq!(req.order_type, OrderType::Limit);
         assert_eq!(req.limit_price, Some(4500.0));
@@ -495,8 +483,13 @@ mod tests {
 
     #[test]
     fn builder_stop_sets_price() {
-        let order =
-            OrderBuilder::stop("XCME:ES.U16", OrderSide::Sell, 1.0, 4400.0, DurationType::Day);
+        let order = OrderBuilder::stop(
+            "XCME:ES.U16",
+            OrderSide::Sell,
+            1.0,
+            4400.0,
+            DurationType::Day,
+        );
         let req = order.to_request();
         assert_eq!(req.order_type, OrderType::Stop);
         assert_eq!(req.stop_price, Some(4400.0));
@@ -553,8 +546,13 @@ mod tests {
         let mock = MockHttp::new(vec![MockResponse::ok(r#"{"orderId":"ORD001"}"#)]);
         let client = test_client_with_auth(mock);
 
-        let order =
-            OrderBuilder::limit("XCME:ES.U16", OrderSide::Buy, 1.0, 4500.0, DurationType::Day);
+        let order = OrderBuilder::limit(
+            "XCME:ES.U16",
+            OrderSide::Buy,
+            1.0,
+            4500.0,
+            DurationType::Day,
+        );
         client.place_order("ACC1", &order).await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
@@ -594,7 +592,10 @@ mod tests {
         let client = test_client_with_auth(mock);
 
         let update = OrderUpdate::new(2);
-        let orders = client.update_order("ACC1", "ORD001", &update).await.unwrap();
+        let orders = client
+            .update_order("ACC1", "ORD001", &update)
+            .await
+            .unwrap();
 
         assert_eq!(orders.len(), 1);
         assert_eq!(orders[0].order_id, "ORD001");
@@ -615,10 +616,12 @@ mod tests {
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::PUT);
-        assert!(reqs[0]
-            .uri
-            .to_string()
-            .ends_with("/order/ACC1/update/ORD001"));
+        assert!(
+            reqs[0]
+                .uri
+                .to_string()
+                .ends_with("/order/ACC1/update/ORD001")
+        );
         let body: serde_json::Value = serde_json::from_slice(&reqs[0].body).unwrap();
         assert_eq!(body["orderId"], "ORD001");
         assert_eq!(body["quantity"], 5);
@@ -637,10 +640,12 @@ mod tests {
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::DELETE);
-        assert!(reqs[0]
-            .uri
-            .to_string()
-            .ends_with("/order/ACC1/cancel/ORD001"));
+        assert!(
+            reqs[0]
+                .uri
+                .to_string()
+                .ends_with("/order/ACC1/cancel/ORD001")
+        );
     }
 
     // --- cancel_orders ---
@@ -657,10 +662,12 @@ mod tests {
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::DELETE);
-        assert!(reqs[0]
-            .uri
-            .to_string()
-            .ends_with("/order/ACC1/cancelMultiple"));
+        assert!(
+            reqs[0]
+                .uri
+                .to_string()
+                .ends_with("/order/ACC1/cancelMultiple")
+        );
         let body: serde_json::Value = serde_json::from_slice(&reqs[0].body).unwrap();
         assert_eq!(body["accountId"], "ACC1");
         assert_eq!(body["orderIds"], serde_json::json!(["ORD001", "ORD002"]));
@@ -757,10 +764,12 @@ mod tests {
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
-        assert!(reqs[0]
-            .uri
-            .to_string()
-            .ends_with("/order/ACC1/toorderid/100"));
+        assert!(
+            reqs[0]
+                .uri
+                .to_string()
+                .ends_with("/order/ACC1/toorderid/100")
+        );
     }
 
     // --- strategy_id_from_order ---
@@ -779,10 +788,12 @@ mod tests {
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
-        assert!(reqs[0]
-            .uri
-            .to_string()
-            .ends_with("/order/ACC1/tostrategyId/ORD001"));
+        assert!(
+            reqs[0]
+                .uri
+                .to_string()
+                .ends_with("/order/ACC1/tostrategyId/ORD001")
+        );
     }
 
     // --- cross-cutting ---
@@ -809,7 +820,10 @@ mod tests {
         )]);
         let client = test_client_with_auth(mock);
 
-        let err = client.orders("ACC1", OrderStatusType::Any).await.unwrap_err();
+        let err = client
+            .orders("ACC1", OrderStatusType::Any)
+            .await
+            .unwrap_err();
 
         match err {
             Error::Api { status, message } => {

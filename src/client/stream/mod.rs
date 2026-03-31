@@ -503,7 +503,12 @@ mod tests {
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs.len(), 2);
-        assert!(reqs[1].uri.to_string().contains("/market/quotes/subscribe/s-1"));
+        assert!(
+            reqs[1]
+                .uri
+                .to_string()
+                .contains("/market/quotes/subscribe/s-1")
+        );
     }
 
     #[tokio::test]
@@ -519,7 +524,12 @@ mod tests {
         stream.unsubscribe_quotes(&["XCME:ES.U25"]).await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
-        assert!(reqs[1].uri.to_string().contains("/market/quotes/unsubscribe/s-1"));
+        assert!(
+            reqs[1]
+                .uri
+                .to_string()
+                .contains("/market/quotes/unsubscribe/s-1")
+        );
     }
 
     #[tokio::test]
@@ -535,7 +545,12 @@ mod tests {
         stream.subscribe_depth(&["XCME:ES.U25"]).await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
-        assert!(reqs[1].uri.to_string().contains("/market/depths/subscribe/s-1"));
+        assert!(
+            reqs[1]
+                .uri
+                .to_string()
+                .contains("/market/depths/subscribe/s-1")
+        );
     }
 
     #[tokio::test]
@@ -551,7 +566,12 @@ mod tests {
         stream.unsubscribe_depth(&["XCME:ES.U25"]).await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
-        assert!(reqs[1].uri.to_string().contains("/market/depths/unsubscribe/s-1"));
+        assert!(
+            reqs[1]
+                .uri
+                .to_string()
+                .contains("/market/depths/unsubscribe/s-1")
+        );
     }
 
     #[tokio::test]
@@ -567,7 +587,12 @@ mod tests {
         stream.subscribe_trades(&["XCME:ES.U25"]).await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
-        assert!(reqs[1].uri.to_string().contains("/market/trades/subscribe/s-1"));
+        assert!(
+            reqs[1]
+                .uri
+                .to_string()
+                .contains("/market/trades/subscribe/s-1")
+        );
     }
 
     #[tokio::test]
@@ -583,7 +608,12 @@ mod tests {
         stream.unsubscribe_trades(&["XCME:ES.U25"]).await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
-        assert!(reqs[1].uri.to_string().contains("/market/trades/unsubscribe/s-1"));
+        assert!(
+            reqs[1]
+                .uri
+                .to_string()
+                .contains("/market/trades/unsubscribe/s-1")
+        );
     }
 
     #[tokio::test]
@@ -612,7 +642,12 @@ mod tests {
 
         assert_eq!(resp.indicator_id, "IND1");
         let reqs = client.request.http.recorded_requests();
-        assert!(reqs[1].uri.to_string().contains("/indicator/s-1/tradeBars/subscribe"));
+        assert!(
+            reqs[1]
+                .uri
+                .to_string()
+                .contains("/indicator/s-1/tradeBars/subscribe")
+        );
     }
 
     #[tokio::test]
@@ -641,7 +676,12 @@ mod tests {
 
         assert_eq!(resp.indicator_id, "IND2");
         let reqs = client.request.http.recorded_requests();
-        assert!(reqs[1].uri.to_string().contains("/indicator/s-1/tickBars/subscribe"));
+        assert!(
+            reqs[1]
+                .uri
+                .to_string()
+                .contains("/indicator/s-1/tickBars/subscribe")
+        );
     }
 
     #[tokio::test]
@@ -670,7 +710,12 @@ mod tests {
 
         assert_eq!(resp.indicator_id, "IND3");
         let reqs = client.request.http.recorded_requests();
-        assert!(reqs[1].uri.to_string().contains("/indicator/s-1/timeBars/subscribe"));
+        assert!(
+            reqs[1]
+                .uri
+                .to_string()
+                .contains("/indicator/s-1/timeBars/subscribe")
+        );
     }
 
     #[tokio::test]
@@ -699,7 +744,12 @@ mod tests {
 
         assert_eq!(resp.indicator_id, "IND4");
         let reqs = client.request.http.recorded_requests();
-        assert!(reqs[1].uri.to_string().contains("/indicator/s-1/volumeBars/subscribe"));
+        assert!(
+            reqs[1]
+                .uri
+                .to_string()
+                .contains("/indicator/s-1/volumeBars/subscribe")
+        );
     }
 
     #[tokio::test]
@@ -715,7 +765,12 @@ mod tests {
         stream.unsubscribe_indicator("IND1").await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
-        assert!(reqs[1].uri.to_string().contains("/indicator/s-1/unsubscribe/IND1"));
+        assert!(
+            reqs[1]
+                .uri
+                .to_string()
+                .contains("/indicator/s-1/unsubscribe/IND1")
+        );
     }
 
     #[tokio::test]

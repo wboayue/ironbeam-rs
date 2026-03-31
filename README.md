@@ -1,3 +1,9 @@
+[![Build](https://github.com/wboayue/ironbeam-rs/workflows/CI/badge.svg)](https://github.com/wboayue/ironbeam-rs/actions/workflows/ci.yml)
+[![License:MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![crates.io](https://img.shields.io/crates/v/ironbeam-rs.svg)](https://crates.io/crates/ironbeam-rs)
+[![Documentation](https://img.shields.io/badge/Documentation-green.svg)](https://docs.rs/ironbeam-rs/latest/ironbeam_rs/)
+[![Coverage Status](https://coveralls.io/repos/github/wboayue/ironbeam-rs/badge.png?branch=main)](https://coveralls.io/github/wboayue/ironbeam-rs?branch=main)
+
 # ironbeam-rs
 
 Async Rust client for the [Ironbeam](https://www.ironbeam.com/) futures trading API. Targets low-latency order execution and real-time streaming.
