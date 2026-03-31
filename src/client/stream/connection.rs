@@ -386,9 +386,7 @@ mod tests {
 
     #[tokio::test]
     async fn message_loop_close_with_reason() {
-        let ws = MockWsTransport::new(vec![Ok(WsMessage::Close(Some(
-            "going away".into(),
-        )))]);
+        let ws = MockWsTransport::new(vec![Ok(WsMessage::Close(Some("going away".into())))]);
         let (tx, mut rx) = mpsc::channel(16);
         let (_shutdown_tx, shutdown_rx) = watch::channel(false);
 

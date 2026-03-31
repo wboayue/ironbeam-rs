@@ -475,7 +475,13 @@ mod tests {
             },
             Case {
                 name: "limit",
-                order: OrderBuilder::limit("XCME:ES.U16", OrderSide::Sell, 2.0, 4500.0, DurationType::Day),
+                order: OrderBuilder::limit(
+                    "XCME:ES.U16",
+                    OrderSide::Sell,
+                    2.0,
+                    4500.0,
+                    DurationType::Day,
+                ),
                 expected_type: OrderType::Limit,
                 expected_limit: Some(4500.0),
                 expected_stop: None,
@@ -483,7 +489,13 @@ mod tests {
             },
             Case {
                 name: "stop",
-                order: OrderBuilder::stop("XCME:ES.U16", OrderSide::Sell, 1.0, 4400.0, DurationType::Day),
+                order: OrderBuilder::stop(
+                    "XCME:ES.U16",
+                    OrderSide::Sell,
+                    1.0,
+                    4400.0,
+                    DurationType::Day,
+                ),
                 expected_type: OrderType::Stop,
                 expected_limit: None,
                 expected_stop: Some(4400.0),
@@ -491,7 +503,14 @@ mod tests {
             },
             Case {
                 name: "stop_limit",
-                order: OrderBuilder::stop_limit("XCME:ES.U16", OrderSide::Buy, 1.0, 4500.0, 4400.0, DurationType::GoodTillCancel),
+                order: OrderBuilder::stop_limit(
+                    "XCME:ES.U16",
+                    OrderSide::Buy,
+                    1.0,
+                    4500.0,
+                    4400.0,
+                    DurationType::GoodTillCancel,
+                ),
                 expected_type: OrderType::StopLimit,
                 expected_limit: Some(4500.0),
                 expected_stop: Some(4400.0),

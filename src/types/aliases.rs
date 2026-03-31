@@ -260,7 +260,9 @@ mod tests {
     #[test]
     fn date_yyyymmdd_serde() {
         // round-trip
-        let t = DateTest { d: date!(2024 - 01 - 15) };
+        let t = DateTest {
+            d: date!(2024 - 01 - 15),
+        };
         let json = serde_json::to_string(&t).unwrap();
         assert!(json.contains("20240115"));
         let parsed: DateTest = serde_json::from_str(&json).unwrap();
@@ -302,12 +304,18 @@ mod tests {
         assert_eq!(json, r#"{"d":null}"#);
 
         // serialize Some
-        let json = serde_json::to_string(&OptDateTest { d: Some(date!(2024 - 03 - 15)) }).unwrap();
+        let json = serde_json::to_string(&OptDateTest {
+            d: Some(date!(2024 - 03 - 15)),
+        })
+        .unwrap();
         assert!(json.contains("20240315"));
 
         // round-trip Some
-        let t = OptDateTest { d: Some(date!(2024 - 06 - 15)) };
-        let parsed: OptDateTest = serde_json::from_str(&serde_json::to_string(&t).unwrap()).unwrap();
+        let t = OptDateTest {
+            d: Some(date!(2024 - 06 - 15)),
+        };
+        let parsed: OptDateTest =
+            serde_json::from_str(&serde_json::to_string(&t).unwrap()).unwrap();
         assert_eq!(parsed, t);
 
         // direct deserialize
@@ -319,7 +327,8 @@ mod tests {
     #[test]
     fn option_datetime_rfc3339_serde() {
         // present
-        let parsed: OptRfc3339Test = serde_json::from_str(r#"{"dt":"2016-08-01T00:00:00Z"}"#).unwrap();
+        let parsed: OptRfc3339Test =
+            serde_json::from_str(r#"{"dt":"2016-08-01T00:00:00Z"}"#).unwrap();
         assert_eq!(parsed.dt, Some(datetime!(2016-08-01 00:00:00 UTC)));
 
         // absent
@@ -335,7 +344,9 @@ mod tests {
         assert_eq!(json, r#"{"dt":null}"#);
 
         // round-trip
-        let t = OptRfc3339Test { dt: Some(datetime!(2024-01-15 12:30:00 UTC)) };
+        let t = OptRfc3339Test {
+            dt: Some(datetime!(2024-01-15 12:30:00 UTC)),
+        };
         let json = serde_json::to_string(&t).unwrap();
         assert!(json.contains("2024-01-15T12:30:00Z"));
         let parsed: OptRfc3339Test = serde_json::from_str(&json).unwrap();

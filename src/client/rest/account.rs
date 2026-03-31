@@ -247,7 +247,10 @@ mod tests {
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
         assert!(reqs[0].uri.to_string().ends_with("/account/getAllAccounts"));
-        assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");
+        assert_eq!(
+            reqs[0].headers.get(AUTHORIZATION).unwrap(),
+            "Bearer tok_test"
+        );
     }
 
     #[tokio::test]
@@ -285,7 +288,10 @@ mod tests {
         )]);
         let client = test_client_with_auth(mock);
 
-        let balances = client.balance("ACC1", BalanceType::CurrentOpen).await.unwrap();
+        let balances = client
+            .balance("ACC1", BalanceType::CurrentOpen)
+            .await
+            .unwrap();
 
         assert_eq!(balances.len(), 1);
         assert_eq!(balances[0].account_id, "ACC1");
@@ -295,7 +301,10 @@ mod tests {
         let uri = reqs[0].uri.to_string();
         assert!(uri.contains("/account/ACC1/balance"));
         assert!(uri.contains("balanceType=CURRENT_OPEN"));
-        assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");
+        assert_eq!(
+            reqs[0].headers.get(AUTHORIZATION).unwrap(),
+            "Bearer tok_test"
+        );
     }
 
     #[tokio::test]
@@ -312,7 +321,10 @@ mod tests {
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
         assert!(reqs[0].uri.to_string().ends_with("/account/ACC1/positions"));
-        assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");
+        assert_eq!(
+            reqs[0].headers.get(AUTHORIZATION).unwrap(),
+            "Bearer tok_test"
+        );
     }
 
     #[tokio::test]
@@ -330,7 +342,10 @@ mod tests {
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
         assert!(reqs[0].uri.to_string().ends_with("/account/ACC1/risk"));
-        assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");
+        assert_eq!(
+            reqs[0].headers.get(AUTHORIZATION).unwrap(),
+            "Bearer tok_test"
+        );
     }
 
     #[tokio::test]
@@ -348,7 +363,10 @@ mod tests {
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
         assert!(reqs[0].uri.to_string().ends_with("/account/ACC1/fills"));
-        assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");
+        assert_eq!(
+            reqs[0].headers.get(AUTHORIZATION).unwrap(),
+            "Bearer tok_test"
+        );
     }
 
     #[tokio::test]
@@ -367,7 +385,10 @@ mod tests {
         let uri = reqs[0].uri.to_string();
         assert!(uri.contains("/account/getAllBalances"));
         assert!(uri.contains("balanceType=CURRENT_OPEN"));
-        assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");
+        assert_eq!(
+            reqs[0].headers.get(AUTHORIZATION).unwrap(),
+            "Bearer tok_test"
+        );
     }
 
     #[tokio::test]
@@ -384,8 +405,16 @@ mod tests {
         assert_eq!(positions[0].positions.len(), 1);
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
-        assert!(reqs[0].uri.to_string().ends_with("/account/getAllPositions"));
-        assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");
+        assert!(
+            reqs[0]
+                .uri
+                .to_string()
+                .ends_with("/account/getAllPositions")
+        );
+        assert_eq!(
+            reqs[0].headers.get(AUTHORIZATION).unwrap(),
+            "Bearer tok_test"
+        );
     }
 
     #[tokio::test]
@@ -402,7 +431,10 @@ mod tests {
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
         assert!(reqs[0].uri.to_string().ends_with("/account/getAllRiskInfo"));
-        assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");
+        assert_eq!(
+            reqs[0].headers.get(AUTHORIZATION).unwrap(),
+            "Bearer tok_test"
+        );
     }
 
     #[tokio::test]
@@ -419,6 +451,9 @@ mod tests {
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
         assert!(reqs[0].uri.to_string().ends_with("/account/getAllFills"));
-        assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");
+        assert_eq!(
+            reqs[0].headers.get(AUTHORIZATION).unwrap(),
+            "Bearer tok_test"
+        );
     }
 }
