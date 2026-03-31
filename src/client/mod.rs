@@ -292,6 +292,79 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn symbol_query_rejects_more_than_10() {
+        let mock = MockHttp::new(vec![]);
+        let client = test_client_with_auth(mock);
+        let syms: Vec<&str> = (0..11).map(|_| "SYM").collect();
+
+        let err = client
+            .symbol_query::<serde_json::Value>("/test", &syms)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, Error::Other(msg) if msg.contains("10")));
+    }
+
+    #[tokio::test]
+    async fn post_sends_json_body() {
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"status":"OK"}"#)]);
+        let client = test_client_with_auth(mock);
+
+        let body = serde_json::json!({"key": "val"});
+        let _: crate::types::SuccessResponse = client.post("/test", &body).await.unwrap();
+
+        let reqs = client.request.http.recorded_requests();
+        assert_eq!(reqs[0].method, hyper::Method::POST);
+        assert!(!reqs[0].body.is_empty());
+        let ct = reqs[0]
+            .headers
+            .get(hyper::header::CONTENT_TYPE)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert_eq!(ct, "application/json");
+    }
+
+    #[tokio::test]
+    async fn put_sends_json_body() {
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"status":"OK"}"#)]);
+        let client = test_client_with_auth(mock);
+
+        let body = serde_json::json!({"key": "val"});
+        let _: crate::types::SuccessResponse = client.put("/test", &body).await.unwrap();
+
+        let reqs = client.request.http.recorded_requests();
+        assert_eq!(reqs[0].method, hyper::Method::PUT);
+    }
+
+    #[tokio::test]
+    async fn delete_with_body_sends_json() {
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"status":"OK"}"#)]);
+        let client = test_client_with_auth(mock);
+
+        let body = serde_json::json!({"id": 1});
+        let _: crate::types::SuccessResponse =
+            client.delete_with_body("/test", &body).await.unwrap();
+
+        let reqs = client.request.http.recorded_requests();
+        assert_eq!(reqs[0].method, hyper::Method::DELETE);
+        assert!(!reqs[0].body.is_empty());
+    }
+
+    #[tokio::test]
+    async fn drop_skips_logout_when_already_logged_out() {
+        let mock = MockHttp::new(vec![]);
+        let client = test_client_with_auth(mock.clone());
+        client
+            .is_logged_out
+            .store(true, std::sync::atomic::Ordering::Release);
+
+        drop(client);
+
+        // No requests made — logout was skipped
+        assert!(mock.recorded_requests().is_empty());
+    }
+
+    #[tokio::test]
     async fn request_helper_applies_rate_limiter() {
         let mock = MockHttp::new(vec![
             MockResponse::ok(r#"{"status":"OK"}"#),

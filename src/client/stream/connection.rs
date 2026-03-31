@@ -352,4 +352,56 @@ mod tests {
         // Channel closed, no events
         assert!(rx.recv().await.is_none());
     }
+
+    #[tokio::test]
+    async fn message_loop_handles_binary_frames() {
+        let payload = r#"{"q":[{"s":"XCME:NQ.U25"}]}"#;
+        let ws = MockWsTransport::new(vec![
+            Ok(WsMessage::Binary(Bytes::from(payload))),
+            Ok(WsMessage::Close(None)),
+        ]);
+        let (tx, mut rx) = mpsc::channel(16);
+        let (_shutdown_tx, shutdown_rx) = watch::channel(false);
+
+        tokio::spawn(message_loop(ws, tx, shutdown_rx, "test".into()));
+
+        let event = rx.recv().await.unwrap().unwrap();
+        assert!(matches!(event, StreamEvent::Quotes(..)));
+    }
+
+    #[tokio::test]
+    async fn message_loop_handles_read_error() {
+        let ws = MockWsTransport::new(vec![Err(Error::WebSocket("connection reset".into()))]);
+        let (tx, mut rx) = mpsc::channel(16);
+        let (_shutdown_tx, shutdown_rx) = watch::channel(false);
+
+        tokio::spawn(message_loop(ws, tx, shutdown_rx, "test".into()));
+
+        let event = rx.recv().await.unwrap();
+        assert!(matches!(event, Err(Error::WebSocket(msg)) if msg.contains("connection reset")));
+
+        // Loop exits after error
+        assert!(rx.recv().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn message_loop_close_with_reason() {
+        let ws = MockWsTransport::new(vec![Ok(WsMessage::Close(Some(
+            "going away".into(),
+        )))]);
+        let (tx, mut rx) = mpsc::channel(16);
+        let (_shutdown_tx, shutdown_rx) = watch::channel(false);
+
+        tokio::spawn(message_loop(ws, tx, shutdown_rx, "test".into()));
+
+        let event = rx.recv().await.unwrap();
+        assert!(matches!(event, Err(Error::WebSocket(msg)) if msg.contains("going away")));
+    }
+
+    #[test]
+    fn build_ws_url_encodes_token() {
+        let url = build_ws_url("https://api.example.com/v2", "s1", "tok with spaces").unwrap();
+        assert!(url.contains("tok%20with%20spaces"));
+        assert!(url.starts_with("wss://"));
+    }
 }

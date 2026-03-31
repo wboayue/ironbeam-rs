@@ -759,4 +759,197 @@ mod tests {
     fn depth_side_unknown_integer_rejected() {
         assert!(serde_json::from_str::<DepthSide>("99").is_err());
     }
+
+    // --- alias deserialization (REST string forms) ---
+
+    #[test]
+    fn order_type_alias_deserialization() {
+        assert_eq!(
+            serde_json::from_str::<OrderType>(r#""MARKET""#).unwrap(),
+            OrderType::Market
+        );
+        assert_eq!(
+            serde_json::from_str::<OrderType>(r#""LIMIT""#).unwrap(),
+            OrderType::Limit
+        );
+        assert_eq!(
+            serde_json::from_str::<OrderType>(r#""STOP""#).unwrap(),
+            OrderType::Stop
+        );
+        assert_eq!(
+            serde_json::from_str::<OrderType>(r#""STOP_LIMIT""#).unwrap(),
+            OrderType::StopLimit
+        );
+        assert_eq!(
+            serde_json::from_str::<OrderType>(r#""INVALID""#).unwrap(),
+            OrderType::Invalid
+        );
+    }
+
+    #[test]
+    fn duration_type_alias_deserialization() {
+        assert_eq!(
+            serde_json::from_str::<DurationType>(r#""DAY""#).unwrap(),
+            DurationType::Day
+        );
+        assert_eq!(
+            serde_json::from_str::<DurationType>(r#""GTC""#).unwrap(),
+            DurationType::GoodTillCancel
+        );
+        assert_eq!(
+            serde_json::from_str::<DurationType>(r#""GOOD_TILL_CANCEL""#).unwrap(),
+            DurationType::GoodTillCancel
+        );
+        assert_eq!(
+            serde_json::from_str::<DurationType>(r#""INVALID""#).unwrap(),
+            DurationType::Invalid
+        );
+    }
+
+    #[test]
+    fn order_type_as_str() {
+        assert_eq!(OrderType::Market.as_str(), "1");
+        assert_eq!(OrderType::Limit.as_str(), "2");
+        assert_eq!(OrderType::Stop.as_str(), "3");
+        assert_eq!(OrderType::StopLimit.as_str(), "4");
+        assert_eq!(OrderType::Invalid.as_str(), "");
+    }
+
+    #[test]
+    fn duration_type_as_str() {
+        assert_eq!(DurationType::Day.as_str(), "0");
+        assert_eq!(DurationType::GoodTillCancel.as_str(), "1");
+        assert_eq!(DurationType::Invalid.as_str(), "");
+    }
+
+    #[test]
+    fn unknown_string_rejected() {
+        assert!(serde_json::from_str::<ResponseStatus>(r#""BOGUS""#).is_err());
+        assert!(serde_json::from_str::<OrderType>(r#""BOGUS""#).is_err());
+        assert!(serde_json::from_str::<DepthSide>(r#""X""#).is_err());
+    }
+
+    // --- simple serde enums ---
+
+    #[test]
+    fn position_side_round_trip() {
+        assert_eq!(
+            serde_json::to_string(&PositionSide::Long).unwrap(),
+            r#""LONG""#
+        );
+        assert_eq!(
+            serde_json::from_str::<PositionSide>(r#""SHORT""#).unwrap(),
+            PositionSide::Short
+        );
+    }
+
+    #[test]
+    fn security_type_round_trip() {
+        assert_eq!(
+            serde_json::to_string(&SecurityType::Fut).unwrap(),
+            r#""FUT""#
+        );
+        assert_eq!(
+            serde_json::from_str::<SecurityType>(r#""OPT""#).unwrap(),
+            SecurityType::Opt
+        );
+    }
+
+    #[test]
+    fn option_type_round_trip() {
+        assert_eq!(
+            serde_json::to_string(&OptionType::Call).unwrap(),
+            r#""CALL""#
+        );
+        assert_eq!(
+            serde_json::from_str::<OptionType>(r#""PUT""#).unwrap(),
+            OptionType::Put
+        );
+    }
+
+    #[test]
+    fn option_expiration_type_round_trip() {
+        assert_eq!(
+            serde_json::to_string(&OptionExpirationType::American).unwrap(),
+            r#""AMERICAN""#
+        );
+        assert_eq!(
+            serde_json::from_str::<OptionExpirationType>(r#""EUROPEAN""#).unwrap(),
+            OptionExpirationType::European
+        );
+    }
+
+    #[test]
+    fn side_round_trip() {
+        assert_eq!(serde_json::to_string(&Side::Bid).unwrap(), r#""BID""#);
+        assert_eq!(
+            serde_json::from_str::<Side>(r#""ASK""#).unwrap(),
+            Side::Ask
+        );
+    }
+
+    #[test]
+    fn tick_direction_round_trip() {
+        assert_eq!(
+            serde_json::to_string(&TickDirection::Plus).unwrap(),
+            r#""PLUS""#
+        );
+        assert_eq!(
+            serde_json::from_str::<TickDirection>(r#""MINUS""#).unwrap(),
+            TickDirection::Minus
+        );
+    }
+
+    #[test]
+    fn bar_type_round_trip() {
+        assert_eq!(
+            serde_json::to_string(&BarType::Daily).unwrap(),
+            r#""DAILY""#
+        );
+        assert_eq!(
+            serde_json::from_str::<BarType>(r#""MINUTE""#).unwrap(),
+            BarType::Minute
+        );
+    }
+
+    #[test]
+    fn order_status_as_str_all_variants() {
+        let cases = [
+            (OrderStatusType::Any, "ANY"),
+            (OrderStatusType::Invalid, "INVALID"),
+            (OrderStatusType::Submitted, "SUBMITTED"),
+            (OrderStatusType::New, "NEW"),
+            (OrderStatusType::PartiallyFilled, "PARTIALLY_FILLED"),
+            (OrderStatusType::Filled, "FILLED"),
+            (OrderStatusType::DoneForDay, "DONE_FOR_DAY"),
+            (OrderStatusType::Cancelled, "CANCELLED"),
+            (OrderStatusType::Replaced, "REPLACED"),
+            (OrderStatusType::PendingCancel, "PENDING_CANCEL"),
+            (OrderStatusType::Stopped, "STOPPED"),
+            (OrderStatusType::Rejected, "REJECTED"),
+            (OrderStatusType::Suspended, "SUSPENDED"),
+            (OrderStatusType::PendingNew, "PENDING_NEW"),
+            (OrderStatusType::Calculated, "CALCULATED"),
+            (OrderStatusType::Expired, "EXPIRED"),
+            (OrderStatusType::AcceptedForBidding, "ACCEPTED_FOR_BIDDING"),
+            (OrderStatusType::PendingReplace, "PENDING_REPLACE"),
+            (OrderStatusType::CancelRejected, "CANCEL_REJECTED"),
+            (OrderStatusType::OrderNotFound, "ORDER_NOT_FOUND"),
+            (OrderStatusType::QueuedNew, "QUEUED_NEW"),
+            (OrderStatusType::QueuedCancel, "QUEUED_CANCEL"),
+            (OrderStatusType::Complete, "COMPLETE"),
+        ];
+        for (variant, expected) in cases {
+            assert_eq!(variant.as_str(), expected);
+        }
+    }
+
+    #[test]
+    fn dual_format_from_signed_integer() {
+        // Exercises visit_i64 → visit_u64 path
+        // serde_json parses "0" as u64, but we can force i64 via serde_json::Value
+        let val: serde_json::Value = serde_json::from_str("0").unwrap();
+        let status: ResponseStatus = serde_json::from_value(val).unwrap();
+        assert_eq!(status, ResponseStatus::Ok);
+    }
 }

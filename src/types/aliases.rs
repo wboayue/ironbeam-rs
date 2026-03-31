@@ -265,4 +265,153 @@ mod tests {
         let parsed: OptRfc3339Test = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed, t);
     }
+
+    // --- serialize None branches ---
+
+    #[test]
+    fn option_timestamp_ms_serialize_none() {
+        let t = OptTsTest { ts: None };
+        let json = serde_json::to_string(&t).unwrap();
+        assert_eq!(json, r#"{"ts":null}"#);
+    }
+
+    #[test]
+    fn option_timestamp_ms_deserialize_null() {
+        let parsed: OptTsTest = serde_json::from_str(r#"{"ts":null}"#).unwrap();
+        assert_eq!(parsed.ts, None);
+    }
+
+    #[test]
+    fn option_date_serialize_none() {
+        let t = OptDateTest { d: None };
+        let json = serde_json::to_string(&t).unwrap();
+        assert_eq!(json, r#"{"d":null}"#);
+    }
+
+    #[test]
+    fn option_date_serialize_some() {
+        let t = OptDateTest {
+            d: Some(date!(2024 - 03 - 15)),
+        };
+        let json = serde_json::to_string(&t).unwrap();
+        assert!(json.contains("20240315"));
+    }
+
+    #[test]
+    fn option_date_empty_string_deserializes_as_none() {
+        let parsed: OptDateTest = serde_json::from_str(r#"{"d":""}"#).unwrap();
+        assert_eq!(parsed.d, None);
+    }
+
+    #[test]
+    fn option_datetime_rfc3339_serialize_none() {
+        let t = OptRfc3339Test { dt: None };
+        let json = serde_json::to_string(&t).unwrap();
+        assert_eq!(json, r#"{"dt":null}"#);
+    }
+
+    #[test]
+    fn option_datetime_rfc3339_empty_string_is_none() {
+        let parsed: OptRfc3339Test = serde_json::from_str(r#"{"dt":""}"#).unwrap();
+        assert_eq!(parsed.dt, None);
+    }
+
+    // --- full round-trip serialize+deserialize for Option wrappers ---
+
+    #[test]
+    fn option_timestamp_ms_round_trip_some() {
+        let dt = datetime!(2024-06-15 08:00:00 UTC);
+        let t = OptTsTest { ts: Some(dt) };
+        let json = serde_json::to_string(&t).unwrap();
+        let parsed: OptTsTest = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.ts, Some(dt));
+    }
+
+    #[test]
+    fn option_date_round_trip_some() {
+        let t = OptDateTest {
+            d: Some(date!(2024 - 06 - 15)),
+        };
+        let json = serde_json::to_string(&t).unwrap();
+        let parsed: OptDateTest = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, t);
+    }
+
+    #[test]
+    fn option_date_null_deserializes_as_none() {
+        let parsed: OptDateTest = serde_json::from_str(r#"{"d":null}"#).unwrap();
+        assert_eq!(parsed.d, None);
+    }
+
+    // Direct calls to serde helpers (tarpaulin doesn't credit #[serde(with)])
+    #[test]
+    fn timestamp_ms_deserialize_direct() {
+        let mut de = serde_json::Deserializer::from_str("1705322400000");
+        let dt = timestamp_ms::deserialize(&mut de).unwrap();
+        assert_eq!(dt, datetime!(2024-01-15 12:40:00 UTC));
+    }
+
+    #[test]
+    fn timestamp_ms_serialize_direct() {
+        let dt = datetime!(2024-01-15 12:40:00 UTC);
+        let mut buf = Vec::new();
+        let mut ser = serde_json::Serializer::new(&mut buf);
+        timestamp_ms::serialize(&dt, &mut ser).unwrap();
+        assert_eq!(String::from_utf8(buf).unwrap(), "1705322400000");
+    }
+
+    #[test]
+    fn option_timestamp_ms_deserialize_direct_some() {
+        let mut de = serde_json::Deserializer::from_str("1705322400000");
+        let dt = option_timestamp_ms::deserialize(&mut de).unwrap();
+        assert_eq!(dt, Some(datetime!(2024-01-15 12:40:00 UTC)));
+    }
+
+    #[test]
+    fn option_timestamp_ms_serialize_direct_some() {
+        let dt = Some(datetime!(2024-06-15 08:00:00 UTC));
+        let mut buf = Vec::new();
+        let mut ser = serde_json::Serializer::new(&mut buf);
+        option_timestamp_ms::serialize(&dt, &mut ser).unwrap();
+        assert!(!String::from_utf8(buf).unwrap().is_empty());
+    }
+
+    #[test]
+    fn date_yyyymmdd_deserialize_direct() {
+        let mut de = serde_json::Deserializer::from_str(r#""20240115""#);
+        let d = date_yyyymmdd::deserialize(&mut de).unwrap();
+        assert_eq!(d, date!(2024 - 01 - 15));
+    }
+
+    #[test]
+    fn date_yyyymmdd_serialize_direct() {
+        let d = date!(2024 - 01 - 15);
+        let mut buf = Vec::new();
+        let mut ser = serde_json::Serializer::new(&mut buf);
+        date_yyyymmdd::serialize(&d, &mut ser).unwrap();
+        assert!(String::from_utf8(buf).unwrap().contains("20240115"));
+    }
+
+    #[test]
+    fn option_date_yyyymmdd_deserialize_direct_some() {
+        let mut de = serde_json::Deserializer::from_str(r#""20240315""#);
+        let d = option_date_yyyymmdd::deserialize(&mut de).unwrap();
+        assert_eq!(d, Some(date!(2024 - 03 - 15)));
+    }
+
+    #[test]
+    fn option_datetime_rfc3339_deserialize_direct_some() {
+        let mut de = serde_json::Deserializer::from_str(r#""2024-01-15T12:30:00Z""#);
+        let dt = option_datetime_rfc3339::deserialize(&mut de).unwrap();
+        assert_eq!(dt, Some(datetime!(2024-01-15 12:30:00 UTC)));
+    }
+
+    #[test]
+    fn option_datetime_rfc3339_serialize_direct_some() {
+        let dt = Some(datetime!(2024-01-15 12:30:00 UTC));
+        let mut buf = Vec::new();
+        let mut ser = serde_json::Serializer::new(&mut buf);
+        option_datetime_rfc3339::serialize(&dt, &mut ser).unwrap();
+        assert!(String::from_utf8(buf).unwrap().contains("2024-01-15"));
+    }
 }
