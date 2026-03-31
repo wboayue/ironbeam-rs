@@ -459,7 +459,7 @@ mod tests {
         let info = client.trader_info(None).await.unwrap();
 
         assert_eq!(info.accounts, vec!["ACC1"]);
-        assert_eq!(info.is_live, true);
+        assert!(info.is_live);
         assert_eq!(info.trader_id, "T1");
     }
 

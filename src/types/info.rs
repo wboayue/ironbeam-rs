@@ -179,7 +179,7 @@ mod tests {
         let json = r#"{"accounts":["ACC001","ACC002"],"isLive":true,"traderId":"T001"}"#;
         let t: TraderInfo = serde_json::from_str(json).unwrap();
         assert_eq!(t.accounts.len(), 2);
-        assert_eq!(t.is_live, true);
+        assert!(t.is_live);
     }
 
     #[test]
