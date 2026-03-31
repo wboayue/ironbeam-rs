@@ -450,7 +450,7 @@ mod tests {
     // --- trader_info ---
 
     #[tokio::test]
-    async fn trader_info_returns_info() {
+    async fn trader_info() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"accounts":["ACC1"],"isLive":true,"traderId":"T1"}"#,
         )]);
@@ -461,16 +461,6 @@ mod tests {
         assert_eq!(info.accounts, vec!["ACC1"]);
         assert!(info.is_live);
         assert_eq!(info.trader_id, "T1");
-    }
-
-    #[tokio::test]
-    async fn trader_info_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(
-            r#"{"accounts":[],"isLive":false,"traderId":"T1"}"#,
-        )]);
-        let client = test_client_with_auth(mock);
-
-        client.trader_info(None).await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
@@ -494,24 +484,16 @@ mod tests {
     // --- user_info ---
 
     #[tokio::test]
-    async fn user_info_returns_info() {
+    async fn user_info() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"accountTitle":"Test","emailAddress1":"a@b.com","accounts":["ACC1"]}"#,
         )]);
         let client = test_client_with_auth(mock);
 
-        let info = client.user_info(None).await.unwrap();
+        let info = client.user_info(Some("T1")).await.unwrap();
 
         assert_eq!(info.account_title.as_deref(), Some("Test"));
         assert_eq!(info.email_address_1.as_deref(), Some("a@b.com"));
-    }
-
-    #[tokio::test]
-    async fn user_info_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"accounts":[]}"#)]);
-        let client = test_client_with_auth(mock);
-
-        client.user_info(Some("T1")).await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
         let uri = reqs[0].uri.to_string();
@@ -521,7 +503,7 @@ mod tests {
     // --- security_definitions ---
 
     #[tokio::test]
-    async fn security_definitions_returns_defs() {
+    async fn security_definitions() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"securityDefinitions":[{"exchSym":"XCME:ES.U16","productDescription":"E-mini S&P"}]}"#,
         )]);
@@ -532,17 +514,6 @@ mod tests {
         assert_eq!(defs.len(), 1);
         assert_eq!(defs[0].exch_sym, "XCME:ES.U16");
         assert_eq!(defs[0].product_description.as_deref(), Some("E-mini S&P"));
-    }
-
-    #[tokio::test]
-    async fn security_definitions_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"securityDefinitions":[]}"#)]);
-        let client = test_client_with_auth(mock);
-
-        client
-            .security_definitions(&["XCME:ES.U16", "XCME:NQ.U16"])
-            .await
-            .unwrap();
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
@@ -554,7 +525,7 @@ mod tests {
     // --- security_margin ---
 
     #[tokio::test]
-    async fn security_margin_returns_margins() {
+    async fn security_margin() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"securityMarginAndValues":[{"exchSym":"XCME:ES.U16","initialMarginLong":12000.0}]}"#,
         )]);
@@ -564,14 +535,6 @@ mod tests {
 
         assert_eq!(margins.len(), 1);
         assert_eq!(margins[0].initial_margin_long, Some(12000.0));
-    }
-
-    #[tokio::test]
-    async fn security_margin_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"securityMarginAndValues":[]}"#)]);
-        let client = test_client_with_auth(mock);
-
-        client.security_margin(&["XCME:ES.U16"]).await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
         let uri = reqs[0].uri.to_string();
@@ -581,7 +544,7 @@ mod tests {
     // --- security_status ---
 
     #[tokio::test]
-    async fn security_status_returns_statuses() {
+    async fn security_status() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"securityStatuses":[{"exchSym":"XCME:ES.U16","statusValue":17}]}"#,
         )]);
@@ -591,14 +554,6 @@ mod tests {
 
         assert_eq!(statuses.len(), 1);
         assert_eq!(statuses[0].status_value, Some(17));
-    }
-
-    #[tokio::test]
-    async fn security_status_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"securityStatuses":[]}"#)]);
-        let client = test_client_with_auth(mock);
-
-        client.security_status(&["XCME:ES.U16"]).await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
         let uri = reqs[0].uri.to_string();
@@ -608,29 +563,20 @@ mod tests {
     // --- symbols ---
 
     #[tokio::test]
-    async fn symbols_returns_results() {
+    async fn symbols() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"symbols":[{"symbol":"XCME:ES.U16","description":"E-mini S&P","symbolType":"Future"}]}"#,
         )]);
-        let client = test_client_with_auth(mock);
-
-        let params = SymbolSearchParams::new().text("ES").limit(5);
-        let symbols = client.symbols(&params).await.unwrap();
-
-        assert_eq!(symbols.len(), 1);
-        assert_eq!(symbols[0].symbol, "XCME:ES.U16");
-    }
-
-    #[tokio::test]
-    async fn symbols_sends_correct_uri_with_params() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"symbols":[]}"#)]);
         let client = test_client_with_auth(mock);
 
         let params = SymbolSearchParams::new()
             .text("ES")
             .limit(10)
             .prefer_active(true);
-        client.symbols(&params).await.unwrap();
+        let symbols = client.symbols(&params).await.unwrap();
+
+        assert_eq!(symbols.len(), 1);
+        assert_eq!(symbols[0].symbol, "XCME:ES.U16");
 
         let reqs = client.request.http.recorded_requests();
         let uri = reqs[0].uri.to_string();
@@ -692,21 +638,13 @@ mod tests {
     // --- exchange_sources ---
 
     #[tokio::test]
-    async fn exchange_sources_returns_list() {
+    async fn exchange_sources() {
         let mock = MockHttp::new(vec![MockResponse::ok(r#"{"exchanges":["XCME","XCBT"]}"#)]);
         let client = test_client_with_auth(mock);
 
         let exchanges = client.exchange_sources().await.unwrap();
 
         assert_eq!(exchanges, vec!["XCME", "XCBT"]);
-    }
-
-    #[tokio::test]
-    async fn exchange_sources_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"exchanges":[]}"#)]);
-        let client = test_client_with_auth(mock);
-
-        client.exchange_sources().await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
@@ -716,7 +654,7 @@ mod tests {
     // --- complexes ---
 
     #[tokio::test]
-    async fn complexes_returns_groups() {
+    async fn complexes() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"marketComplexes":[{"name":"Equity","groups":[{"group":"ES","name":"E-mini S&P"}]}]}"#,
         )]);
@@ -727,14 +665,6 @@ mod tests {
         assert_eq!(complexes.len(), 1);
         assert_eq!(complexes[0].name.as_deref(), Some("Equity"));
         assert_eq!(complexes[0].groups.len(), 1);
-    }
-
-    #[tokio::test]
-    async fn complexes_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"marketComplexes":[]}"#)]);
-        let client = test_client_with_auth(mock);
-
-        client.complexes("XCME").await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
         assert!(reqs[0].uri.to_string().ends_with("/info/complexes/XCME"));
@@ -743,7 +673,7 @@ mod tests {
     // --- futures_symbols ---
 
     #[tokio::test]
-    async fn futures_symbols_returns_futures() {
+    async fn futures_symbols() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"symbols":[{"symbol":"XCME:ES.U16","maturityMonth":"Sep","maturityYear":2016,"description":"E-mini S&P"}]}"#,
         )]);
@@ -754,14 +684,6 @@ mod tests {
         assert_eq!(futures.len(), 1);
         assert_eq!(futures[0].symbol, "XCME:ES.U16");
         assert_eq!(futures[0].maturity_year, Some(2016));
-    }
-
-    #[tokio::test]
-    async fn futures_symbols_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"symbols":[]}"#)]);
-        let client = test_client_with_auth(mock);
-
-        client.futures_symbols("XCME", "ES").await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
         assert!(
@@ -775,7 +697,7 @@ mod tests {
     // --- symbol_groups ---
 
     #[tokio::test]
-    async fn symbol_groups_returns_groups() {
+    async fn symbol_groups() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"symbolGroups":[{"group":"6E","name":"Euro FX"}]}"#,
         )]);
@@ -785,14 +707,6 @@ mod tests {
 
         assert_eq!(groups.len(), 1);
         assert_eq!(groups[0].group.as_deref(), Some("6E"));
-    }
-
-    #[tokio::test]
-    async fn symbol_groups_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"symbolGroups":[]}"#)]);
-        let client = test_client_with_auth(mock);
-
-        client.symbol_groups("Currency").await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
         assert!(
@@ -806,7 +720,7 @@ mod tests {
     // --- option_groups ---
 
     #[tokio::test]
-    async fn option_groups_returns_result() {
+    async fn option_groups() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"groups":["G1","G2"],"optionGroups":[{"group":"G1","description":"Group 1"}]}"#,
         )]);
@@ -820,14 +734,6 @@ mod tests {
             result.option_groups[0].description.as_deref(),
             Some("Group 1")
         );
-    }
-
-    #[tokio::test]
-    async fn option_groups_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"groups":[],"optionGroups":[]}"#)]);
-        let client = test_client_with_auth(mock);
-
-        client.option_groups("XCME:ES.U16").await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
         let uri = reqs[0].uri.to_string();
@@ -837,7 +743,7 @@ mod tests {
     // --- search_options ---
 
     #[tokio::test]
-    async fn search_options_returns_symbols() {
+    async fn search_options() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"symbolOptions":["XCME:ES.U16.C4500","XCME:ES.U16.C4600"]}"#,
         )]);
@@ -849,17 +755,6 @@ mod tests {
             .unwrap();
 
         assert_eq!(options.len(), 2);
-    }
-
-    #[tokio::test]
-    async fn search_options_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"symbolOptions":[]}"#)]);
-        let client = test_client_with_auth(mock);
-
-        client
-            .search_options("XCME:ES.U16", "ES", "call", true)
-            .await
-            .unwrap();
 
         let reqs = client.request.http.recorded_requests();
         let uri = reqs[0].uri.to_string();
@@ -870,7 +765,7 @@ mod tests {
     // --- option_spreads ---
 
     #[tokio::test]
-    async fn option_spreads_returns_spreads() {
+    async fn option_spreads() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"symbolSpreads":["+1:XCME:ES.U16.C4500:-1:XCME:ES.U16.C4600"]}"#,
         )]);
@@ -879,14 +774,6 @@ mod tests {
         let spreads = client.option_spreads("XCME:ES.U16").await.unwrap();
 
         assert_eq!(spreads.len(), 1);
-    }
-
-    #[tokio::test]
-    async fn option_spreads_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"symbolSpreads":[]}"#)]);
-        let client = test_client_with_auth(mock);
-
-        client.option_spreads("XCME:ES.U16").await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
         let uri = reqs[0].uri.to_string();
@@ -896,7 +783,7 @@ mod tests {
     // --- strategy_id ---
 
     #[tokio::test]
-    async fn strategy_id_returns_response() {
+    async fn strategy_id() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"Id":12345,"Minimum":10000,"Maximum":20000}"#,
         )]);
@@ -907,16 +794,6 @@ mod tests {
         assert_eq!(resp.id, 12345);
         assert_eq!(resp.minimum, 10000);
         assert_eq!(resp.maximum, 20000);
-    }
-
-    #[tokio::test]
-    async fn strategy_id_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(
-            r#"{"Id":1,"Minimum":0,"Maximum":100}"#,
-        )]);
-        let client = test_client_with_auth(mock);
-
-        client.strategy_id().await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);

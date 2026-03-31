@@ -236,10 +236,8 @@ mod tests {
     use crate::error::Error;
     use crate::types::BalanceType;
 
-    // --- all_accounts ---
-
     #[tokio::test]
-    async fn all_accounts_returns_list() {
+    async fn all_accounts() {
         let mock = MockHttp::new(vec![MockResponse::ok(r#"{"accounts":["ACC1","ACC2"]}"#)]);
         let client = test_client_with_auth(mock);
 
@@ -249,20 +247,7 @@ mod tests {
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
         assert!(reqs[0].uri.to_string().ends_with("/account/getAllAccounts"));
-    }
-
-    #[tokio::test]
-    async fn all_accounts_sends_auth_header() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"accounts":[]}"#)]);
-        let client = test_client_with_auth(mock);
-
-        client.all_accounts().await.unwrap();
-
-        let reqs = client.request.http.recorded_requests();
-        assert_eq!(
-            reqs[0].headers.get(AUTHORIZATION).unwrap(),
-            "Bearer tok_test"
-        );
+        assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");
     }
 
     #[tokio::test]
@@ -293,63 +278,28 @@ mod tests {
         assert!(matches!(err, Error::Json(_)));
     }
 
-    // --- balance ---
-
     #[tokio::test]
-    async fn balance_returns_balances() {
+    async fn balance() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"balances":[{"accountId":"ACC1","currencyCode":"USD","cashBalance":50000.0}]}"#,
         )]);
         let client = test_client_with_auth(mock);
 
-        let balances = client
-            .balance("ACC1", BalanceType::CurrentOpen)
-            .await
-            .unwrap();
+        let balances = client.balance("ACC1", BalanceType::CurrentOpen).await.unwrap();
 
         assert_eq!(balances.len(), 1);
         assert_eq!(balances[0].account_id, "ACC1");
         assert_eq!(balances[0].cash_balance, Some(50000.0));
-    }
-
-    #[tokio::test]
-    async fn balance_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"balances":[]}"#)]);
-        let client = test_client_with_auth(mock);
-
-        client
-            .balance("ACC1", BalanceType::StartOfDay)
-            .await
-            .unwrap();
-
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
         let uri = reqs[0].uri.to_string();
         assert!(uri.contains("/account/ACC1/balance"));
-        assert!(uri.contains("balanceType=START_OF_DAY"));
+        assert!(uri.contains("balanceType=CURRENT_OPEN"));
+        assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");
     }
 
     #[tokio::test]
-    async fn balance_sends_auth_header() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"balances":[]}"#)]);
-        let client = test_client_with_auth(mock);
-
-        client
-            .balance("ACC1", BalanceType::CurrentOpen)
-            .await
-            .unwrap();
-
-        let reqs = client.request.http.recorded_requests();
-        assert_eq!(
-            reqs[0].headers.get(AUTHORIZATION).unwrap(),
-            "Bearer tok_test"
-        );
-    }
-
-    // --- positions ---
-
-    #[tokio::test]
-    async fn positions_returns_response() {
+    async fn positions() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"accountId":"ACC1","positions":[{"accountId":"ACC1","exchSym":"XCME:ES.U16","quantity":2.0,"price":4500.0,"side":"LONG"}]}"#,
         )]);
@@ -359,26 +309,14 @@ mod tests {
 
         assert_eq!(positions.len(), 1);
         assert_eq!(positions[0].exch_sym.as_deref(), Some("XCME:ES.U16"));
-    }
-
-    #[tokio::test]
-    async fn positions_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(
-            r#"{"accountId":"ACC1","positions":[]}"#,
-        )]);
-        let client = test_client_with_auth(mock);
-
-        client.positions("ACC1").await.unwrap();
-
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
         assert!(reqs[0].uri.to_string().ends_with("/account/ACC1/positions"));
+        assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");
     }
 
-    // --- risk ---
-
     #[tokio::test]
-    async fn risk_returns_risks() {
+    async fn risk() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"risks":[{"accountId":"ACC1","regCode":"COMBINED","currencyCode":"USD","liquidationValue":100000.0,"startNetLiquidationValue":95000.0,"currentNetLiquidationValue":98000.0,"maxNetLiquidationValue":100000.0,"maxNetLiquidationValueMultiDay":100000.0,"liquidationEvents":[]}]}"#,
         )]);
@@ -389,24 +327,14 @@ mod tests {
         assert_eq!(risks.len(), 1);
         assert_eq!(risks[0].account_id, "ACC1");
         assert_eq!(risks[0].current_net_liquidation_value, Some(98000.0));
-    }
-
-    #[tokio::test]
-    async fn risk_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"risks":[]}"#)]);
-        let client = test_client_with_auth(mock);
-
-        client.risk("ACC1").await.unwrap();
-
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
         assert!(reqs[0].uri.to_string().ends_with("/account/ACC1/risk"));
+        assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");
     }
 
-    // --- fills ---
-
     #[tokio::test]
-    async fn fills_returns_fills() {
+    async fn fills() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"fills":[{"orderId":"ORD1","strategyId":1,"accountId":"ACC1","exchSym":"XCME:ES.U16","status":"FILLED","side":"BUY","quantity":1.0,"price":4500.0,"fillQuantity":1.0,"fillTotalQuantity":1.0,"fillPrice":4500.0,"avgFillPrice":4500.0,"fillDate":"2025-01-15T10:30:00Z","timeOrderEvent":1705312200000,"orderUpdateId":"UPD1"}]}"#,
         )]);
@@ -417,24 +345,14 @@ mod tests {
         assert_eq!(fills.len(), 1);
         assert_eq!(fills[0].order_id, "ORD1");
         assert_eq!(fills[0].fill_price, Some(4500.0));
-    }
-
-    #[tokio::test]
-    async fn fills_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"fills":[]}"#)]);
-        let client = test_client_with_auth(mock);
-
-        client.fills("ACC1").await.unwrap();
-
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
         assert!(reqs[0].uri.to_string().ends_with("/account/ACC1/fills"));
+        assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");
     }
 
-    // --- all_balances ---
-
     #[tokio::test]
-    async fn all_balances_returns_balances() {
+    async fn all_balances() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"balances":[{"accountId":"ACC1","currencyCode":"USD","cashBalance":50000.0}]}"#,
         )]);
@@ -444,26 +362,16 @@ mod tests {
 
         assert_eq!(balances.len(), 1);
         assert_eq!(balances[0].account_id, "ACC1");
-    }
-
-    #[tokio::test]
-    async fn all_balances_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"balances":[]}"#)]);
-        let client = test_client_with_auth(mock);
-
-        client.all_balances(BalanceType::StartOfDay).await.unwrap();
-
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
         let uri = reqs[0].uri.to_string();
         assert!(uri.contains("/account/getAllBalances"));
-        assert!(uri.contains("balanceType=START_OF_DAY"));
+        assert!(uri.contains("balanceType=CURRENT_OPEN"));
+        assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");
     }
 
-    // --- all_positions ---
-
     #[tokio::test]
-    async fn all_positions_returns_positions() {
+    async fn all_positions() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"positions":[{"accountId":"ACC1","positions":[{"accountId":"ACC1","exchSym":"XCME:ES.U16","quantity":2.0,"price":4500.0,"side":"LONG"}]}]}"#,
         )]);
@@ -474,29 +382,14 @@ mod tests {
         assert_eq!(positions.len(), 1);
         assert_eq!(positions[0].account_id, "ACC1");
         assert_eq!(positions[0].positions.len(), 1);
-    }
-
-    #[tokio::test]
-    async fn all_positions_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"positions":[]}"#)]);
-        let client = test_client_with_auth(mock);
-
-        client.all_positions().await.unwrap();
-
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
-        assert!(
-            reqs[0]
-                .uri
-                .to_string()
-                .ends_with("/account/getAllPositions")
-        );
+        assert!(reqs[0].uri.to_string().ends_with("/account/getAllPositions"));
+        assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");
     }
 
-    // --- all_risk ---
-
     #[tokio::test]
-    async fn all_risk_returns_risks() {
+    async fn all_risk() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"risks":[{"accountId":"ACC1","regCode":"COMBINED","currencyCode":"USD","liquidationValue":100000.0,"startNetLiquidationValue":95000.0,"currentNetLiquidationValue":98000.0,"maxNetLiquidationValue":100000.0,"maxNetLiquidationValueMultiDay":100000.0,"liquidationEvents":[]}]}"#,
         )]);
@@ -506,24 +399,14 @@ mod tests {
 
         assert_eq!(risks.len(), 1);
         assert_eq!(risks[0].account_id, "ACC1");
-    }
-
-    #[tokio::test]
-    async fn all_risk_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"risks":[]}"#)]);
-        let client = test_client_with_auth(mock);
-
-        client.all_risk().await.unwrap();
-
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
         assert!(reqs[0].uri.to_string().ends_with("/account/getAllRiskInfo"));
+        assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");
     }
 
-    // --- all_fills ---
-
     #[tokio::test]
-    async fn all_fills_returns_fills() {
+    async fn all_fills() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"fills":[{"orderId":"ORD1","strategyId":1,"accountId":"ACC1","exchSym":"XCME:ES.U16","status":"FILLED","side":"BUY","quantity":1.0,"price":4500.0,"fillQuantity":1.0,"fillTotalQuantity":1.0,"fillPrice":4500.0,"avgFillPrice":4500.0,"fillDate":"2025-01-15T10:30:00Z","timeOrderEvent":1705312200000,"orderUpdateId":"UPD1"}]}"#,
         )]);
@@ -533,17 +416,9 @@ mod tests {
 
         assert_eq!(fills.len(), 1);
         assert_eq!(fills[0].order_id, "ORD1");
-    }
-
-    #[tokio::test]
-    async fn all_fills_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"fills":[]}"#)]);
-        let client = test_client_with_auth(mock);
-
-        client.all_fills().await.unwrap();
-
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
         assert!(reqs[0].uri.to_string().ends_with("/account/getAllFills"));
+        assert_eq!(reqs[0].headers.get(AUTHORIZATION).unwrap(), "Bearer tok_test");
     }
 }

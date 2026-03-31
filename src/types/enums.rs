@@ -460,101 +460,290 @@ dual_format_enum! {
 mod tests {
     use super::*;
 
-    #[test]
-    fn order_type_round_trip() {
-        assert_eq!(serde_json::to_string(&OrderType::Market).unwrap(), "\"1\"");
-        assert_eq!(serde_json::to_string(&OrderType::Limit).unwrap(), "\"2\"");
-        assert_eq!(serde_json::to_string(&OrderType::Stop).unwrap(), "\"3\"");
-        assert_eq!(
-            serde_json::to_string(&OrderType::StopLimit).unwrap(),
-            "\"4\""
-        );
-        assert_eq!(serde_json::to_string(&OrderType::Invalid).unwrap(), "\"\"");
+    // --- Simple serde round-trip tests (string-only enums) ---
 
-        assert_eq!(
-            serde_json::from_str::<OrderType>("\"1\"").unwrap(),
-            OrderType::Market
-        );
-        assert_eq!(
-            serde_json::from_str::<OrderType>("\"\"").unwrap(),
-            OrderType::Invalid
-        );
+    macro_rules! test_serde_round_trip {
+        ($($name:ident: $type:ty => [$(($variant:expr, $json:expr)),+ $(,)?]),+ $(,)?) => {
+            $(
+                #[test]
+                fn $name() {
+                    $(
+                        let json = serde_json::to_string(&$variant).unwrap();
+                        assert_eq!(json, $json, "serialize {:?}", $variant);
+                        let parsed: $type = serde_json::from_str($json).unwrap();
+                        assert_eq!(parsed, $variant, "deserialize {}", $json);
+                    )+
+                }
+            )+
+        };
     }
 
-    #[test]
-    fn duration_type_round_trip() {
-        assert_eq!(serde_json::to_string(&DurationType::Day).unwrap(), "\"0\"");
-        assert_eq!(
-            serde_json::to_string(&DurationType::GoodTillCancel).unwrap(),
-            "\"1\""
-        );
-        assert_eq!(
-            serde_json::from_str::<DurationType>("\"0\"").unwrap(),
-            DurationType::Day
-        );
-        assert_eq!(
-            serde_json::from_str::<DurationType>("\"\"").unwrap(),
-            DurationType::Invalid
-        );
+    test_serde_round_trip! {
+        position_side_round_trip: PositionSide => [
+            (PositionSide::Long, r#""LONG""#),
+            (PositionSide::Short, r#""SHORT""#),
+        ],
+        security_type_round_trip: SecurityType => [
+            (SecurityType::Fut, r#""FUT""#),
+            (SecurityType::Opt, r#""OPT""#),
+        ],
+        option_type_round_trip: OptionType => [
+            (OptionType::Call, r#""CALL""#),
+            (OptionType::Put, r#""PUT""#),
+        ],
+        option_expiration_type_round_trip: OptionExpirationType => [
+            (OptionExpirationType::American, r#""AMERICAN""#),
+            (OptionExpirationType::European, r#""EUROPEAN""#),
+        ],
+        side_round_trip: Side => [
+            (Side::Bid, r#""BID""#),
+            (Side::Ask, r#""ASK""#),
+        ],
+        tick_direction_round_trip: TickDirection => [
+            (TickDirection::Plus, r#""PLUS""#),
+            (TickDirection::Minus, r#""MINUS""#),
+        ],
+        bar_type_round_trip: BarType => [
+            (BarType::Daily, r#""DAILY""#),
+            (BarType::Minute, r#""MINUTE""#),
+        ],
     }
 
-    #[test]
-    fn security_status_type_round_trip() {
-        assert_eq!(
-            serde_json::to_string(&SecurityStatusType::Open).unwrap(),
-            r#""OPEN""#
-        );
-        assert_eq!(
-            serde_json::from_str::<SecurityStatusType>(r#""CLOSED""#).unwrap(),
-            SecurityStatusType::Closed
-        );
-        assert_eq!(
-            serde_json::from_str::<SecurityStatusType>("17").unwrap(),
-            SecurityStatusType::Open
-        );
-        assert_eq!(
-            serde_json::from_str::<SecurityStatusType>("126").unwrap(),
-            SecurityStatusType::PostClose
-        );
+    // --- Dual-format round-trip tests (string + integer deserialization) ---
+
+    macro_rules! test_dual_format {
+        ($($name:ident: $type:ty => {
+            ser: [$(($ser_variant:expr, $ser_json:expr)),+ $(,)?],
+            deser: [$(($deser_input:expr, $deser_expected:expr)),+ $(,)?]
+        }),+ $(,)?) => {
+            $(
+                #[test]
+                fn $name() {
+                    // Serialization
+                    $(
+                        let json = serde_json::to_string(&$ser_variant).unwrap();
+                        assert_eq!(json, $ser_json, "serialize {:?}", $ser_variant);
+                    )+
+                    // Deserialization (string and/or integer inputs)
+                    $(
+                        let parsed: $type = serde_json::from_str($deser_input).unwrap();
+                        assert_eq!(parsed, $deser_expected, "deserialize {}", $deser_input);
+                    )+
+                }
+            )+
+        };
     }
 
-    #[test]
-    fn aggressor_side_round_trip() {
-        // Serializes as string
-        assert_eq!(
-            serde_json::to_string(&AggressorSideType::Buy).unwrap(),
-            r#""BUY""#
-        );
-        // Deserializes from integer (streaming)
-        assert_eq!(
-            serde_json::from_str::<AggressorSideType>("2").unwrap(),
-            AggressorSideType::Sell
-        );
-        // Deserializes from string (REST)
-        assert_eq!(
-            serde_json::from_str::<AggressorSideType>(r#""BUY""#).unwrap(),
-            AggressorSideType::Buy
-        );
+    test_dual_format! {
+        order_type_round_trip: OrderType => {
+            ser: [
+                (OrderType::Market, "\"1\""),
+                (OrderType::Limit, "\"2\""),
+                (OrderType::Stop, "\"3\""),
+                (OrderType::StopLimit, "\"4\""),
+                (OrderType::Invalid, "\"\""),
+            ],
+            deser: [
+                ("\"1\"", OrderType::Market),
+                ("\"\"", OrderType::Invalid),
+            ]
+        },
+        duration_type_round_trip: DurationType => {
+            ser: [
+                (DurationType::Day, "\"0\""),
+                (DurationType::GoodTillCancel, "\"1\""),
+            ],
+            deser: [
+                ("\"0\"", DurationType::Day),
+                ("\"\"", DurationType::Invalid),
+            ]
+        },
+        security_status_type_round_trip: SecurityStatusType => {
+            ser: [
+                (SecurityStatusType::Open, r#""OPEN""#),
+            ],
+            deser: [
+                (r#""CLOSED""#, SecurityStatusType::Closed),
+                ("17", SecurityStatusType::Open),
+                ("126", SecurityStatusType::PostClose),
+            ]
+        },
+        aggressor_side_round_trip: AggressorSideType => {
+            ser: [
+                (AggressorSideType::Buy, r#""BUY""#),
+            ],
+            deser: [
+                ("2", AggressorSideType::Sell),
+                (r#""BUY""#, AggressorSideType::Buy),
+            ]
+        },
+        tick_direction_type_round_trip: TickDirectionType => {
+            ser: [
+                (TickDirectionType::Invalid, r#""INVALID""#),
+            ],
+            deser: [
+                ("0", TickDirectionType::Plus),
+                (r#""SAME""#, TickDirectionType::Same),
+            ]
+        },
+        response_status_round_trip: ResponseStatus => {
+            ser: [
+                (ResponseStatus::Ok, "\"OK\""),
+            ],
+            deser: [
+                ("\"ERROR\"", ResponseStatus::Error),
+                ("0", ResponseStatus::Ok),
+                ("1", ResponseStatus::Error),
+            ]
+        },
+        balance_type_round_trip: BalanceType => {
+            ser: [
+                (BalanceType::CurrentOpen, "\"CURRENT_OPEN\""),
+            ],
+            deser: [
+                ("\"START_OF_DAY\"", BalanceType::StartOfDay),
+                ("0", BalanceType::CurrentOpen),
+                ("1", BalanceType::StartOfDay),
+            ]
+        },
+        reg_code_type_round_trip: RegCodeType => {
+            ser: [
+                (RegCodeType::Combined, "\"COMBINED\""),
+            ],
+            deser: [
+                ("\"NON_SECURED\"", RegCodeType::NonSecured),
+                ("0", RegCodeType::Invalid),
+                ("1", RegCodeType::Combined),
+                ("4", RegCodeType::Secured),
+            ]
+        },
+        depth_side_round_trip: DepthSide => {
+            ser: [
+                (DepthSide::Bid, "\"B\""),
+            ],
+            deser: [
+                ("\"A\"", DepthSide::Ask),
+                ("0", DepthSide::Bid),
+                ("1", DepthSide::Ask),
+            ]
+        },
+        block_trade_round_trip: BlockTrade => {
+            ser: [
+                (BlockTrade::Efp, "\"EFP\""),
+                (BlockTrade::OffExchange, "\"OFF_EXCHANGE\""),
+            ],
+            deser: [
+                ("0", BlockTrade::Invalid),
+                ("2", BlockTrade::Efp),
+            ]
+        },
+        system_priced_trade_round_trip: SystemPricedTrade => {
+            ser: [
+                (SystemPricedTrade::System, "\"SYSTEM\""),
+            ],
+            deser: [
+                ("0", SystemPricedTrade::Invalid),
+                ("\"CRACK\"", SystemPricedTrade::Crack),
+            ]
+        },
+        investigation_status_round_trip: InvestigationStatus => {
+            ser: [
+                (InvestigationStatus::Investigating, "\"INVESTIGATING\""),
+            ],
+            deser: [
+                ("0", InvestigationStatus::Invalid),
+                ("\"COMPLETED\"", InvestigationStatus::Completed),
+            ]
+        },
     }
 
-    #[test]
-    fn tick_direction_type_round_trip() {
-        // Serializes as string
-        assert_eq!(
-            serde_json::to_string(&TickDirectionType::Invalid).unwrap(),
-            r#""INVALID""#
-        );
-        // Deserializes from integer (streaming)
-        assert_eq!(
-            serde_json::from_str::<TickDirectionType>("0").unwrap(),
-            TickDirectionType::Plus
-        );
-        // Deserializes from string (REST)
-        assert_eq!(
-            serde_json::from_str::<TickDirectionType>(r#""SAME""#).unwrap(),
-            TickDirectionType::Same
-        );
+    // --- Rejection tests (invalid inputs) ---
+
+    macro_rules! test_deser_rejected {
+        ($($name:ident: $type:ty => [$($input:expr),+ $(,)?]),+ $(,)?) => {
+            $(
+                #[test]
+                fn $name() {
+                    $(
+                        assert!(serde_json::from_str::<$type>($input).is_err(), "expected error for {}", $input);
+                    )+
+                }
+            )+
+        };
     }
+
+    test_deser_rejected! {
+        balance_type_rejected: BalanceType => ["-1", "99"],
+        reg_code_type_rejected: RegCodeType => ["-1", "99"],
+        depth_side_rejected: DepthSide => ["-1", "99"],
+        unknown_string_rejected: ResponseStatus => [r#""BOGUS""#],
+        unknown_order_type_rejected: OrderType => [r#""BOGUS""#],
+        unknown_depth_side_rejected: DepthSide => [r#""X""#],
+    }
+
+    // --- Alias deserialization tests ---
+
+    macro_rules! test_alias_deser {
+        ($($name:ident: $type:ty => [$(($input:expr, $expected:expr)),+ $(,)?]),+ $(,)?) => {
+            $(
+                #[test]
+                fn $name() {
+                    $(
+                        let parsed: $type = serde_json::from_str($input).unwrap();
+                        assert_eq!(parsed, $expected, "alias deserialize {}", $input);
+                    )+
+                }
+            )+
+        };
+    }
+
+    test_alias_deser! {
+        order_type_alias_deserialization: OrderType => [
+            (r#""MARKET""#, OrderType::Market),
+            (r#""LIMIT""#, OrderType::Limit),
+            (r#""STOP""#, OrderType::Stop),
+            (r#""STOP_LIMIT""#, OrderType::StopLimit),
+            (r#""INVALID""#, OrderType::Invalid),
+        ],
+        duration_type_alias_deserialization: DurationType => [
+            (r#""DAY""#, DurationType::Day),
+            (r#""GTC""#, DurationType::GoodTillCancel),
+            (r#""GOOD_TILL_CANCEL""#, DurationType::GoodTillCancel),
+            (r#""INVALID""#, DurationType::Invalid),
+        ],
+    }
+
+    // --- as_str tests ---
+
+    macro_rules! test_as_str {
+        ($($name:ident: $type:ty => [$(($variant:expr, $expected:expr)),+ $(,)?]),+ $(,)?) => {
+            $(
+                #[test]
+                fn $name() {
+                    $(
+                        assert_eq!($variant.as_str(), $expected, "as_str for {:?}", $variant);
+                    )+
+                }
+            )+
+        };
+    }
+
+    test_as_str! {
+        order_type_as_str: OrderType => [
+            (OrderType::Market, "1"),
+            (OrderType::Limit, "2"),
+            (OrderType::Stop, "3"),
+            (OrderType::StopLimit, "4"),
+            (OrderType::Invalid, ""),
+        ],
+        duration_type_as_str: DurationType => [
+            (DurationType::Day, "0"),
+            (DurationType::GoodTillCancel, "1"),
+            (DurationType::Invalid, ""),
+        ],
+    }
+
+    // --- Unique tests kept as-is ---
 
     #[test]
     fn order_status_round_trip() {
@@ -581,334 +770,6 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&ExchangeStrategyType::OneTwo).unwrap(),
             "\"12\""
-        );
-    }
-
-    #[test]
-    fn block_trade_round_trip() {
-        assert_eq!(serde_json::to_string(&BlockTrade::Efp).unwrap(), "\"EFP\"");
-        assert_eq!(
-            serde_json::to_string(&BlockTrade::OffExchange).unwrap(),
-            "\"OFF_EXCHANGE\""
-        );
-        assert_eq!(
-            serde_json::from_str::<BlockTrade>("0").unwrap(),
-            BlockTrade::Invalid
-        );
-        assert_eq!(
-            serde_json::from_str::<BlockTrade>("2").unwrap(),
-            BlockTrade::Efp
-        );
-    }
-
-    #[test]
-    fn system_priced_trade_round_trip() {
-        assert_eq!(
-            serde_json::to_string(&SystemPricedTrade::System).unwrap(),
-            "\"SYSTEM\""
-        );
-        assert_eq!(
-            serde_json::from_str::<SystemPricedTrade>("0").unwrap(),
-            SystemPricedTrade::Invalid
-        );
-        assert_eq!(
-            serde_json::from_str::<SystemPricedTrade>("\"CRACK\"").unwrap(),
-            SystemPricedTrade::Crack
-        );
-    }
-
-    #[test]
-    fn investigation_status_round_trip() {
-        assert_eq!(
-            serde_json::to_string(&InvestigationStatus::Investigating).unwrap(),
-            "\"INVESTIGATING\""
-        );
-        assert_eq!(
-            serde_json::from_str::<InvestigationStatus>("0").unwrap(),
-            InvestigationStatus::Invalid
-        );
-        assert_eq!(
-            serde_json::from_str::<InvestigationStatus>("\"COMPLETED\"").unwrap(),
-            InvestigationStatus::Completed
-        );
-    }
-
-    #[test]
-    fn response_status_round_trip() {
-        assert_eq!(
-            serde_json::to_string(&ResponseStatus::Ok).unwrap(),
-            "\"OK\""
-        );
-        assert_eq!(
-            serde_json::from_str::<ResponseStatus>("\"ERROR\"").unwrap(),
-            ResponseStatus::Error
-        );
-    }
-
-    #[test]
-    fn response_status_from_integer() {
-        assert_eq!(
-            serde_json::from_str::<ResponseStatus>("0").unwrap(),
-            ResponseStatus::Ok
-        );
-        assert_eq!(
-            serde_json::from_str::<ResponseStatus>("1").unwrap(),
-            ResponseStatus::Error
-        );
-    }
-
-    #[test]
-    fn balance_type_round_trip() {
-        assert_eq!(
-            serde_json::to_string(&BalanceType::CurrentOpen).unwrap(),
-            "\"CURRENT_OPEN\""
-        );
-        assert_eq!(
-            serde_json::from_str::<BalanceType>("\"START_OF_DAY\"").unwrap(),
-            BalanceType::StartOfDay
-        );
-    }
-
-    #[test]
-    fn balance_type_from_integer() {
-        assert_eq!(
-            serde_json::from_str::<BalanceType>("0").unwrap(),
-            BalanceType::CurrentOpen
-        );
-        assert_eq!(
-            serde_json::from_str::<BalanceType>("1").unwrap(),
-            BalanceType::StartOfDay
-        );
-    }
-
-    #[test]
-    fn balance_type_negative_integer_rejected() {
-        assert!(serde_json::from_str::<BalanceType>("-1").is_err());
-    }
-
-    #[test]
-    fn balance_type_unknown_integer_rejected() {
-        assert!(serde_json::from_str::<BalanceType>("99").is_err());
-    }
-
-    #[test]
-    fn reg_code_type_round_trip() {
-        assert_eq!(
-            serde_json::to_string(&RegCodeType::Combined).unwrap(),
-            "\"COMBINED\""
-        );
-        assert_eq!(
-            serde_json::from_str::<RegCodeType>("\"NON_SECURED\"").unwrap(),
-            RegCodeType::NonSecured
-        );
-    }
-
-    #[test]
-    fn reg_code_type_from_integer() {
-        assert_eq!(
-            serde_json::from_str::<RegCodeType>("0").unwrap(),
-            RegCodeType::Invalid
-        );
-        assert_eq!(
-            serde_json::from_str::<RegCodeType>("1").unwrap(),
-            RegCodeType::Combined
-        );
-        assert_eq!(
-            serde_json::from_str::<RegCodeType>("4").unwrap(),
-            RegCodeType::Secured
-        );
-    }
-
-    #[test]
-    fn reg_code_type_negative_integer_rejected() {
-        assert!(serde_json::from_str::<RegCodeType>("-1").is_err());
-    }
-
-    #[test]
-    fn reg_code_type_unknown_integer_rejected() {
-        assert!(serde_json::from_str::<RegCodeType>("99").is_err());
-    }
-
-    #[test]
-    fn depth_side_round_trip() {
-        assert_eq!(serde_json::to_string(&DepthSide::Bid).unwrap(), "\"B\"");
-        assert_eq!(
-            serde_json::from_str::<DepthSide>("\"A\"").unwrap(),
-            DepthSide::Ask
-        );
-    }
-
-    #[test]
-    fn depth_side_from_integer() {
-        assert_eq!(
-            serde_json::from_str::<DepthSide>("0").unwrap(),
-            DepthSide::Bid
-        );
-        assert_eq!(
-            serde_json::from_str::<DepthSide>("1").unwrap(),
-            DepthSide::Ask
-        );
-    }
-
-    #[test]
-    fn depth_side_negative_integer_rejected() {
-        assert!(serde_json::from_str::<DepthSide>("-1").is_err());
-    }
-
-    #[test]
-    fn depth_side_unknown_integer_rejected() {
-        assert!(serde_json::from_str::<DepthSide>("99").is_err());
-    }
-
-    // --- alias deserialization (REST string forms) ---
-
-    #[test]
-    fn order_type_alias_deserialization() {
-        assert_eq!(
-            serde_json::from_str::<OrderType>(r#""MARKET""#).unwrap(),
-            OrderType::Market
-        );
-        assert_eq!(
-            serde_json::from_str::<OrderType>(r#""LIMIT""#).unwrap(),
-            OrderType::Limit
-        );
-        assert_eq!(
-            serde_json::from_str::<OrderType>(r#""STOP""#).unwrap(),
-            OrderType::Stop
-        );
-        assert_eq!(
-            serde_json::from_str::<OrderType>(r#""STOP_LIMIT""#).unwrap(),
-            OrderType::StopLimit
-        );
-        assert_eq!(
-            serde_json::from_str::<OrderType>(r#""INVALID""#).unwrap(),
-            OrderType::Invalid
-        );
-    }
-
-    #[test]
-    fn duration_type_alias_deserialization() {
-        assert_eq!(
-            serde_json::from_str::<DurationType>(r#""DAY""#).unwrap(),
-            DurationType::Day
-        );
-        assert_eq!(
-            serde_json::from_str::<DurationType>(r#""GTC""#).unwrap(),
-            DurationType::GoodTillCancel
-        );
-        assert_eq!(
-            serde_json::from_str::<DurationType>(r#""GOOD_TILL_CANCEL""#).unwrap(),
-            DurationType::GoodTillCancel
-        );
-        assert_eq!(
-            serde_json::from_str::<DurationType>(r#""INVALID""#).unwrap(),
-            DurationType::Invalid
-        );
-    }
-
-    #[test]
-    fn order_type_as_str() {
-        assert_eq!(OrderType::Market.as_str(), "1");
-        assert_eq!(OrderType::Limit.as_str(), "2");
-        assert_eq!(OrderType::Stop.as_str(), "3");
-        assert_eq!(OrderType::StopLimit.as_str(), "4");
-        assert_eq!(OrderType::Invalid.as_str(), "");
-    }
-
-    #[test]
-    fn duration_type_as_str() {
-        assert_eq!(DurationType::Day.as_str(), "0");
-        assert_eq!(DurationType::GoodTillCancel.as_str(), "1");
-        assert_eq!(DurationType::Invalid.as_str(), "");
-    }
-
-    #[test]
-    fn unknown_string_rejected() {
-        assert!(serde_json::from_str::<ResponseStatus>(r#""BOGUS""#).is_err());
-        assert!(serde_json::from_str::<OrderType>(r#""BOGUS""#).is_err());
-        assert!(serde_json::from_str::<DepthSide>(r#""X""#).is_err());
-    }
-
-    // --- simple serde enums ---
-
-    #[test]
-    fn position_side_round_trip() {
-        assert_eq!(
-            serde_json::to_string(&PositionSide::Long).unwrap(),
-            r#""LONG""#
-        );
-        assert_eq!(
-            serde_json::from_str::<PositionSide>(r#""SHORT""#).unwrap(),
-            PositionSide::Short
-        );
-    }
-
-    #[test]
-    fn security_type_round_trip() {
-        assert_eq!(
-            serde_json::to_string(&SecurityType::Fut).unwrap(),
-            r#""FUT""#
-        );
-        assert_eq!(
-            serde_json::from_str::<SecurityType>(r#""OPT""#).unwrap(),
-            SecurityType::Opt
-        );
-    }
-
-    #[test]
-    fn option_type_round_trip() {
-        assert_eq!(
-            serde_json::to_string(&OptionType::Call).unwrap(),
-            r#""CALL""#
-        );
-        assert_eq!(
-            serde_json::from_str::<OptionType>(r#""PUT""#).unwrap(),
-            OptionType::Put
-        );
-    }
-
-    #[test]
-    fn option_expiration_type_round_trip() {
-        assert_eq!(
-            serde_json::to_string(&OptionExpirationType::American).unwrap(),
-            r#""AMERICAN""#
-        );
-        assert_eq!(
-            serde_json::from_str::<OptionExpirationType>(r#""EUROPEAN""#).unwrap(),
-            OptionExpirationType::European
-        );
-    }
-
-    #[test]
-    fn side_round_trip() {
-        assert_eq!(serde_json::to_string(&Side::Bid).unwrap(), r#""BID""#);
-        assert_eq!(
-            serde_json::from_str::<Side>(r#""ASK""#).unwrap(),
-            Side::Ask
-        );
-    }
-
-    #[test]
-    fn tick_direction_round_trip() {
-        assert_eq!(
-            serde_json::to_string(&TickDirection::Plus).unwrap(),
-            r#""PLUS""#
-        );
-        assert_eq!(
-            serde_json::from_str::<TickDirection>(r#""MINUS""#).unwrap(),
-            TickDirection::Minus
-        );
-    }
-
-    #[test]
-    fn bar_type_round_trip() {
-        assert_eq!(
-            serde_json::to_string(&BarType::Daily).unwrap(),
-            r#""DAILY""#
-        );
-        assert_eq!(
-            serde_json::from_str::<BarType>(r#""MINUTE""#).unwrap(),
-            BarType::Minute
         );
     }
 

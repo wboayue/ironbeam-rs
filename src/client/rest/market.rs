@@ -115,31 +115,21 @@ mod tests {
         (from, to)
     }
 
-    // --- quotes ---
-
     #[tokio::test]
-    async fn quotes_returns_results() {
+    async fn quotes() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"Quotes":[{"s":"XCME:ES.U16","l":4500.0,"b":4499.75,"a":4500.25}]}"#,
         )]);
         let client = test_client_with_auth(mock);
 
-        let quotes = client.quotes(&["XCME:ES.U16"]).await.unwrap();
+        let quotes = client
+            .quotes(&["XCME:ES.U16", "XCME:NQ.U16"])
+            .await
+            .unwrap();
 
         assert_eq!(quotes.len(), 1);
         assert_eq!(quotes[0].symbol, "XCME:ES.U16");
         assert_eq!(quotes[0].last_price, Some(4500.0));
-    }
-
-    #[tokio::test]
-    async fn quotes_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"Quotes":[]}"#)]);
-        let client = test_client_with_auth(mock);
-
-        client
-            .quotes(&["XCME:ES.U16", "XCME:NQ.U16"])
-            .await
-            .unwrap();
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
@@ -150,18 +140,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn quotes_rejects_empty_symbols() {
-        let mock = MockHttp::new(vec![]);
-        let client = test_client_with_auth(mock);
-
-        let err = client.quotes(&[]).await.unwrap_err();
-        assert!(matches!(err, Error::Other(msg) if msg.contains("empty")));
-    }
-
-    // --- depth ---
-
-    #[tokio::test]
-    async fn depth_returns_results() {
+    async fn depth() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"Depths":[{"s":"XCME:ES.U16","b":[{"l":0,"s":"B","p":4499.75,"sz":10.0}],"a":[{"l":0,"s":"A","p":4500.25,"sz":5.0}]}]}"#,
         )]);
@@ -173,14 +152,6 @@ mod tests {
         assert_eq!(depths[0].symbol, "XCME:ES.U16");
         assert_eq!(depths[0].bids.len(), 1);
         assert_eq!(depths[0].asks.len(), 1);
-    }
-
-    #[tokio::test]
-    async fn depth_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"Depths":[]}"#)]);
-        let client = test_client_with_auth(mock);
-
-        client.depth(&["XCME:ES.U16"]).await.unwrap();
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
@@ -189,18 +160,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn depth_rejects_empty_symbols() {
-        let mock = MockHttp::new(vec![]);
-        let client = test_client_with_auth(mock);
-
-        let err = client.depth(&[]).await.unwrap_err();
-        assert!(matches!(err, Error::Other(msg) if msg.contains("empty")));
-    }
-
-    // --- trades ---
-
-    #[tokio::test]
-    async fn trades_returns_results() {
+    async fn trades() {
         let mock = MockHttp::new(vec![MockResponse::ok(
             r#"{"traders":[{"symbol":"XCME:ES.U16","price":4500.0,"size":1.0}]}"#,
         )]);
@@ -208,25 +168,13 @@ mod tests {
 
         let (from, to) = test_time_range();
         let trades = client
-            .trades("XCME:ES.U16", from, to, 50, true)
+            .trades("XCME:ES.U16", from, to, 10, false)
             .await
             .unwrap();
 
         assert_eq!(trades.len(), 1);
         assert_eq!(trades[0].symbol, "XCME:ES.U16");
         assert_eq!(trades[0].price, 4500.0);
-    }
-
-    #[tokio::test]
-    async fn trades_sends_correct_uri() {
-        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"traders":[]}"#)]);
-        let client = test_client_with_auth(mock);
-
-        let (from, to) = test_time_range();
-        client
-            .trades("XCME:ES.U16", from, to, 10, false)
-            .await
-            .unwrap();
 
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
@@ -235,24 +183,29 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn trades_rejects_zero_max() {
+    async fn rejects_empty_symbols() {
         let mock = MockHttp::new(vec![]);
         let client = test_client_with_auth(mock);
 
+        let err = client.quotes(&[]).await.unwrap_err();
+        assert!(matches!(err, Error::Other(msg) if msg.contains("empty")));
+
+        let err = client.depth(&[]).await.unwrap_err();
+        assert!(matches!(err, Error::Other(msg) if msg.contains("empty")));
+    }
+
+    #[tokio::test]
+    async fn trades_rejects_invalid_max() {
+        let mock = MockHttp::new(vec![]);
+        let client = test_client_with_auth(mock);
         let (from, to) = test_time_range();
+
         let err = client
             .trades("XCME:ES.U16", from, to, 0, true)
             .await
             .unwrap_err();
         assert!(matches!(err, Error::Other(msg) if msg.contains("1–100")));
-    }
 
-    #[tokio::test]
-    async fn trades_rejects_over_100_max() {
-        let mock = MockHttp::new(vec![]);
-        let client = test_client_with_auth(mock);
-
-        let (from, to) = test_time_range();
         let err = client
             .trades("XCME:ES.U16", from, to, 101, true)
             .await

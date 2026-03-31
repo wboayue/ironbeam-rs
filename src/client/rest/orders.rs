@@ -454,63 +454,64 @@ mod tests {
     // --- OrderBuilder ---
 
     #[test]
-    fn builder_market_sets_fields() {
-        let order = OrderBuilder::market("XCME:ES.U16", OrderSide::Buy, 1.0, DurationType::Day);
-        let req = order.to_request();
-        assert_eq!(req.exch_sym, "XCME:ES.U16");
-        assert_eq!(req.side, OrderSide::Buy);
-        assert_eq!(req.quantity, 1.0);
-        assert_eq!(req.order_type, OrderType::Market);
-        assert_eq!(req.duration, DurationType::Day);
-        assert!(req.limit_price.is_none());
-        assert!(req.stop_price.is_none());
-    }
+    fn builder_order_types() {
+        struct Case {
+            name: &'static str,
+            order: OrderBuilder,
+            expected_type: OrderType,
+            expected_limit: Option<f64>,
+            expected_stop: Option<f64>,
+            expected_duration: DurationType,
+        }
 
-    #[test]
-    fn builder_limit_sets_price() {
-        let order = OrderBuilder::limit(
-            "XCME:ES.U16",
-            OrderSide::Sell,
-            2.0,
-            4500.0,
-            DurationType::Day,
-        );
-        let req = order.to_request();
-        assert_eq!(req.order_type, OrderType::Limit);
-        assert_eq!(req.limit_price, Some(4500.0));
-        assert!(req.stop_price.is_none());
-    }
+        let cases = [
+            Case {
+                name: "market",
+                order: OrderBuilder::market("XCME:ES.U16", OrderSide::Buy, 1.0, DurationType::Day),
+                expected_type: OrderType::Market,
+                expected_limit: None,
+                expected_stop: None,
+                expected_duration: DurationType::Day,
+            },
+            Case {
+                name: "limit",
+                order: OrderBuilder::limit("XCME:ES.U16", OrderSide::Sell, 2.0, 4500.0, DurationType::Day),
+                expected_type: OrderType::Limit,
+                expected_limit: Some(4500.0),
+                expected_stop: None,
+                expected_duration: DurationType::Day,
+            },
+            Case {
+                name: "stop",
+                order: OrderBuilder::stop("XCME:ES.U16", OrderSide::Sell, 1.0, 4400.0, DurationType::Day),
+                expected_type: OrderType::Stop,
+                expected_limit: None,
+                expected_stop: Some(4400.0),
+                expected_duration: DurationType::Day,
+            },
+            Case {
+                name: "stop_limit",
+                order: OrderBuilder::stop_limit("XCME:ES.U16", OrderSide::Buy, 1.0, 4500.0, 4400.0, DurationType::GoodTillCancel),
+                expected_type: OrderType::StopLimit,
+                expected_limit: Some(4500.0),
+                expected_stop: Some(4400.0),
+                expected_duration: DurationType::GoodTillCancel,
+            },
+        ];
 
-    #[test]
-    fn builder_stop_sets_price() {
-        let order = OrderBuilder::stop(
-            "XCME:ES.U16",
-            OrderSide::Sell,
-            1.0,
-            4400.0,
-            DurationType::Day,
-        );
-        let req = order.to_request();
-        assert_eq!(req.order_type, OrderType::Stop);
-        assert_eq!(req.stop_price, Some(4400.0));
-        assert!(req.limit_price.is_none());
-    }
+        // Verify common fields on the market case
+        let market_req = cases[0].order.to_request();
+        assert_eq!(market_req.exch_sym, "XCME:ES.U16", "market exch_sym");
+        assert_eq!(market_req.side, OrderSide::Buy, "market side");
+        assert_eq!(market_req.quantity, 1.0, "market quantity");
 
-    #[test]
-    fn builder_stop_limit_sets_both_prices() {
-        let order = OrderBuilder::stop_limit(
-            "XCME:ES.U16",
-            OrderSide::Buy,
-            1.0,
-            4500.0,
-            4400.0,
-            DurationType::GoodTillCancel,
-        );
-        let req = order.to_request();
-        assert_eq!(req.order_type, OrderType::StopLimit);
-        assert_eq!(req.limit_price, Some(4500.0));
-        assert_eq!(req.stop_price, Some(4400.0));
-        assert_eq!(req.duration, DurationType::GoodTillCancel);
+        for case in &cases {
+            let req = case.order.to_request();
+            assert_eq!(req.order_type, case.expected_type, "{}", case.name);
+            assert_eq!(req.limit_price, case.expected_limit, "{}", case.name);
+            assert_eq!(req.stop_price, case.expected_stop, "{}", case.name);
+            assert_eq!(req.duration, case.expected_duration, "{}", case.name);
+        }
     }
 
     #[test]
