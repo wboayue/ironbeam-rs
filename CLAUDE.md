@@ -29,6 +29,10 @@ Documentation in `specs/`. Start with `specs/README.md` for auth pattern, stream
 - Examples must pace calls (≥250ms between requests) and keep total calls under 10/sec including auth/logout.
 - Symbol search (`/info/symbols`) requires a minimum of 3 characters in the `text` parameter; shorter strings return 400 "Invalid text length".
 
+## Workflow
+
+Create a new branch before starting work on any feature, fix, or doc update. Never commit directly to `main`.
+
 ## Architecture
 
 ### Design Principles
