@@ -81,6 +81,18 @@ impl<'a> SymbolSearchParams<'a> {
     }
 }
 
+/// Qualify a symbol with exchange prefix if not already qualified.
+///
+/// `futures_symbols` may return either `"ES.M26"` or `"XCME:ES.M26"`.
+/// This ensures the result always has the `X{exchange}:` prefix.
+fn qualify(symbol: &str, exchange: &str) -> String {
+    if symbol.contains(':') {
+        symbol.to_string()
+    } else {
+        format!("X{exchange}:{symbol}")
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Client methods
 // ---------------------------------------------------------------------------
@@ -413,6 +425,62 @@ impl<H: HttpTransport> Client<H> {
             .get(&format!("/info/symbol/search/options/spreads/{symbol}"))
             .await?;
         Ok(resp.symbol_spreads)
+    }
+
+    /// Returns the exchange-qualified symbol for the active front-month contract.
+    ///
+    /// Fetches the futures chain via [`futures_symbols`](Client::futures_symbols),
+    /// then checks the first contract's `expiration_time` from its security
+    /// definition. If expiration is within `roll_days_before_expiry` calendar
+    /// days, returns the next contract instead.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use ironbeam_rs::client::{Client, Credentials};
+    /// # async fn example() -> ironbeam_rs::error::Result<()> {
+    /// # let client = Client::builder()
+    /// #     .credentials(Credentials { username: "u".into(), password: "p".into(), api_key: "k".into() })
+    /// #     .connect().await?;
+    /// let symbol = client.front_month("CME", "ES", 5).await?;
+    /// println!("Front month: {symbol}");
+    /// let quotes = client.quotes(&[&symbol]).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn front_month(
+        &self,
+        exchange: &str,
+        product: &str,
+        roll_days_before_expiry: u32,
+    ) -> Result<Symbol> {
+        let futures = self.futures_symbols(exchange, product).await?;
+        if futures.is_empty() {
+            return Err(crate::error::Error::Other(format!(
+                "no contracts found for {exchange} {product}"
+            )));
+        }
+
+        let front = &futures[0];
+        let front_qualified = qualify(&front.symbol, exchange);
+
+        // If only one contract or no roll window, return front month.
+        if futures.len() < 2 || roll_days_before_expiry == 0 {
+            return Ok(front_qualified);
+        }
+
+        // Check expiration to decide whether to roll.
+        let defs = self.security_definitions(&[&front_qualified]).await?;
+        let should_roll = defs.first().and_then(|d| d.expiration_time).is_some_and(|exp| {
+            let days_left = (exp - time::OffsetDateTime::now_utc()).whole_days();
+            days_left >= 0 && days_left <= roll_days_before_expiry as i64
+        });
+
+        if should_roll {
+            Ok(qualify(&futures[1].symbol, exchange))
+        } else {
+            Ok(front_qualified)
+        }
     }
 
     /// Get a new strategy ID for order grouping.
@@ -798,6 +866,120 @@ mod tests {
         let reqs = client.request.http.recorded_requests();
         assert_eq!(reqs[0].method, Method::GET);
         assert!(reqs[0].uri.to_string().ends_with("/info/strategyId"));
+    }
+
+    // --- qualify helper ---
+
+    #[test]
+    fn qualify_adds_exchange_prefix() {
+        assert_eq!(super::qualify("ES.M26", "CME"), "XCME:ES.M26");
+    }
+
+    #[test]
+    fn qualify_preserves_already_qualified() {
+        assert_eq!(super::qualify("XCME:ES.M26", "CME"), "XCME:ES.M26");
+    }
+
+    // --- front_month ---
+
+    #[tokio::test]
+    async fn front_month_returns_first_contract() {
+        let mock = MockHttp::new(vec![
+            // futures_symbols response
+            MockResponse::ok(
+                r#"{"symbols":[
+                    {"symbol":"ES.M26","maturityMonth":"Jun","maturityYear":2026},
+                    {"symbol":"ES.U26","maturityMonth":"Sep","maturityYear":2026}
+                ]}"#,
+            ),
+            // security_definitions response — expiration far in future
+            MockResponse::ok(
+                r#"{"securityDefinitions":[{"exchSym":"XCME:ES.M26","expirationTime":1940000000000}]}"#,
+            ),
+        ]);
+        let client = test_client_with_auth(mock);
+
+        let symbol = client.front_month("CME", "ES", 5).await.unwrap();
+        assert_eq!(symbol, "XCME:ES.M26");
+    }
+
+    #[tokio::test]
+    async fn front_month_rolls_when_near_expiry() {
+        // Expiration = now + 2 days, roll_days = 5 → should roll
+        let soon = time::OffsetDateTime::now_utc() + time::Duration::days(2);
+        let exp_ms = soon.unix_timestamp() * 1000;
+
+        let mock = MockHttp::new(vec![
+            MockResponse::ok(
+                r#"{"symbols":[
+                    {"symbol":"ES.M26","maturityMonth":"Jun","maturityYear":2026},
+                    {"symbol":"ES.U26","maturityMonth":"Sep","maturityYear":2026}
+                ]}"#,
+            ),
+            MockResponse::ok(format!(
+                r#"{{"securityDefinitions":[{{"exchSym":"XCME:ES.M26","expirationTime":{exp_ms}}}]}}"#
+            )),
+        ]);
+        let client = test_client_with_auth(mock);
+
+        let symbol = client.front_month("CME", "ES", 5).await.unwrap();
+        assert_eq!(symbol, "XCME:ES.U26");
+    }
+
+    #[tokio::test]
+    async fn front_month_no_roll_when_zero_days() {
+        let mock = MockHttp::new(vec![MockResponse::ok(
+            r#"{"symbols":[
+                {"symbol":"ES.M26","maturityMonth":"Jun","maturityYear":2026},
+                {"symbol":"ES.U26","maturityMonth":"Sep","maturityYear":2026}
+            ]}"#,
+        )]);
+        let client = test_client_with_auth(mock);
+
+        // roll_days=0 skips security_definitions call entirely
+        let symbol = client.front_month("CME", "ES", 0).await.unwrap();
+        assert_eq!(symbol, "XCME:ES.M26");
+    }
+
+    #[tokio::test]
+    async fn front_month_no_contracts() {
+        let mock = MockHttp::new(vec![MockResponse::ok(r#"{"symbols":[]}"#)]);
+        let client = test_client_with_auth(mock);
+
+        let err = client.front_month("CME", "ZZ", 5).await.unwrap_err();
+        assert!(matches!(err, Error::Other(msg) if msg.contains("no contracts")));
+    }
+
+    #[tokio::test]
+    async fn front_month_single_contract_skips_roll() {
+        let mock = MockHttp::new(vec![MockResponse::ok(
+            r#"{"symbols":[{"symbol":"ES.M26","maturityMonth":"Jun","maturityYear":2026}]}"#,
+        )]);
+        let client = test_client_with_auth(mock);
+
+        // Only one contract — no security_definitions call needed
+        let symbol = client.front_month("CME", "ES", 5).await.unwrap();
+        assert_eq!(symbol, "XCME:ES.M26");
+    }
+
+    #[tokio::test]
+    async fn front_month_missing_expiration_stays_on_front() {
+        let mock = MockHttp::new(vec![
+            MockResponse::ok(
+                r#"{"symbols":[
+                    {"symbol":"ES.M26","maturityMonth":"Jun","maturityYear":2026},
+                    {"symbol":"ES.U26","maturityMonth":"Sep","maturityYear":2026}
+                ]}"#,
+            ),
+            // No expirationTime in definition
+            MockResponse::ok(
+                r#"{"securityDefinitions":[{"exchSym":"XCME:ES.M26"}]}"#,
+            ),
+        ]);
+        let client = test_client_with_auth(mock);
+
+        let symbol = client.front_month("CME", "ES", 5).await.unwrap();
+        assert_eq!(symbol, "XCME:ES.M26");
     }
 
     // --- cross-cutting ---
