@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::types::account::AccountPositions;
 use crate::types::common::{PingMessage, Response};
 use crate::types::market::{Depth, QuoteFull, TickBar, TimeBar, TradeBar, TradeOpt, VolumeBar};
@@ -9,7 +11,7 @@ use crate::types::{Balance, Position, RiskInfo};
 ///
 /// Each variant corresponds to a populated field in the raw [`StreamResponse`] envelope.
 /// A single WebSocket message may produce multiple events.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum StreamEvent {
     /// Keepalive ping.
     Ping(PingMessage),
