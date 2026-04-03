@@ -28,6 +28,7 @@ Documentation in `specs/`. Start with `specs/README.md` for auth pattern, stream
 - 429 errors themselves appear to count toward the limit, causing cascading failures.
 - Examples must pace calls (≥250ms between requests) and keep total calls under 10/sec including auth/logout.
 - Symbol search (`/info/symbols`) requires a minimum of 3 characters in the `text` parameter; shorter strings return 400 "Invalid text length".
+- **`/info/security/definitions` batch caveat**: when any symbol in a multi-symbol request is expired or invalid, the API may return an empty `securityDefinitions` array for the entire batch. Always query one symbol at a time when correctness matters (e.g., `front_month`).
 
 ## Workflow
 
